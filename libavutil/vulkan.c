@@ -366,14 +366,11 @@ int ff_vk_exec_pool_init(FFVulkanContext *s, FFVkQueueFamilyCtx *qf,
         pool->query_results = nb_queries;
         pool->query_statuses = 0; /* if radv supports it, nb_queries; */
 
-#if 0 /* CONFIG_VULKAN_ENCODE */
         /* Video encode quieries produce two results per query */
         if (query_type == VK_QUERY_TYPE_VIDEO_ENCODE_FEEDBACK_KHR) {
             pool->query_status_stride = 3; /* skip,skip,result,skip,skip,result */
             pool->query_results *= 2;
-        } else
-#endif
-        if (query_type == VK_QUERY_TYPE_RESULT_STATUS_ONLY_KHR) {
+        } else if (query_type == VK_QUERY_TYPE_RESULT_STATUS_ONLY_KHR) {
             pool->query_status_stride = 1;
             pool->query_results = 0;
             pool->query_statuses = nb_queries;
