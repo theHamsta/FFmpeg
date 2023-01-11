@@ -22,8 +22,8 @@
 
 const FFVkCodecMap ff_vk_codec_map[AV_CODEC_ID_FIRST_AUDIO] = {
     [AV_CODEC_ID_H264] = {
-                           0,
-                           0,
+                           FF_VK_EXT_VIDEO_ENCODE_H264,
+                           VK_VIDEO_CODEC_OPERATION_ENCODE_H264_BIT_EXT,
                            FF_VK_EXT_VIDEO_DECODE_H264,
                            VK_VIDEO_CODEC_OPERATION_DECODE_H264_BIT_KHR,
     },
