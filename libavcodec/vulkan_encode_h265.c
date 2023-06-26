@@ -315,7 +315,7 @@ static av_cold int vulkan_encode_h265_init_sequence_params(AVCodecContext *avctx
         sps->sample_adaptive_offset_enabled_flag = 1;
     sps->sps_temporal_mvp_enabled_flag       = 0;
     sps->pcm_enabled_flag = 0;
-
+    sps->num_short_term_ref_pic_sets     = 0;
     sps->vui_parameters_present_flag = 0;
 
     if (avctx->sample_aspect_ratio.num != 0 &&
@@ -440,6 +440,7 @@ static av_cold int vulkan_encode_h265_init_sequence_params(AVCodecContext *avctx
         .bit_depth_chroma_minus8 = sps->bit_depth_chroma_minus8,
         .pic_width_in_luma_samples  = sps->pic_width_in_luma_samples,
         .pic_height_in_luma_samples = sps->pic_height_in_luma_samples,
+        .log2_max_pic_order_cnt_lsb_minus4 = sps->log2_max_pic_order_cnt_lsb_minus4,
         .log2_min_luma_coding_block_size_minus3 = sps->log2_min_luma_coding_block_size_minus3,
         .flags = (StdVideoH265SpsFlags) {
             .strong_intra_smoothing_enabled_flag = sps->strong_intra_smoothing_enabled_flag,
@@ -703,7 +704,7 @@ static int vulkan_encode_h265_init_pic_headers(AVCodecContext *avctx,
         .slice_type = hpic->slice_type,
         .slice_segment_address = 0,
         .collocated_ref_idx = 0,
-        .MaxNumMergeCand = 0,
+        .MaxNumMergeCand = 5,
         .slice_cb_qp_offset = 0,
         .slice_cr_qp_offset = 0,
         .slice_beta_offset_div2 = 0,
@@ -729,7 +730,7 @@ static int vulkan_encode_h265_init_pic_headers(AVCodecContext *avctx,
             .cross_layer_bla_flag = 0,
             .pic_output_flag = 0,
             .no_output_of_prior_pics_flag = 0,
-            .short_term_ref_pic_set_sps_flag = 0,
+            .short_term_ref_pic_set_sps_flag = 1,
             .slice_temporal_mvp_enabled_flag = 0,
             /* Reserved */
         },
