@@ -619,7 +619,7 @@ static int vulkan_encode_h265_init_pic_headers(AVCodecContext *avctx,
     VulkanEncodeH265Picture   *hpic = pic->priv_data;
     FFVulkanEncodePicture     *prev = pic->prev;
     VulkanEncodeH265Picture  *hprev = prev ? prev->priv_data : NULL;
-
+    int nal_aud_pic_type;
     int qp = pic->qp;
 
     if (pic->type == FF_VK_FRAME_KEY) {
@@ -629,6 +629,7 @@ static int vulkan_encode_h265_init_pic_headers(AVCodecContext *avctx,
 
         hpic->slice_type     = STD_VIDEO_H265_SLICE_TYPE_I;
         hpic->pic_type       = STD_VIDEO_H265_PICTURE_TYPE_IDR;
+        nal_aud_pic_type  = 0;
     } else {
         av_assert0(prev);
 
@@ -637,13 +638,16 @@ static int vulkan_encode_h265_init_pic_headers(AVCodecContext *avctx,
         if (pic->type == FF_VK_FRAME_I) {
             hpic->slice_type     = STD_VIDEO_H265_SLICE_TYPE_I;
             hpic->pic_type       = STD_VIDEO_H265_PICTURE_TYPE_I;
+            nal_aud_pic_type  = 0;
         } else if (pic->type == FF_VK_FRAME_P) {
             av_assert0(pic->refs[0]);
             hpic->slice_type     = STD_VIDEO_H265_SLICE_TYPE_P;
             hpic->pic_type       = STD_VIDEO_H264_PICTURE_TYPE_P;
+            nal_aud_pic_type  = 1;
         } else {
             hpic->slice_type = STD_VIDEO_H264_SLICE_TYPE_B;
             hpic->pic_type   = STD_VIDEO_H264_PICTURE_TYPE_B;
+            nal_aud_pic_type  = 2;
         }
     }
 
@@ -657,7 +661,7 @@ static int vulkan_encode_h265_init_pic_headers(AVCodecContext *avctx,
                 .nal_unit_type = HEVC_NAL_AUD,
                 .nuh_temporal_id_plus1 = 1,
             },
-            .pic_type = 0,
+            .pic_type = nal_aud_pic_type,
         };
         enc->write_units |= UNIT_AUD;
     }
@@ -755,7 +759,7 @@ static int vulkan_encode_h265_init_pic_headers(AVCodecContext *avctx,
                 .unused_for_reference = 0,
             },
             .PicOrderCntVal = href->pic_order_cnt,
-            .pic_type = 0,
+            .pic_type = href->pic_type,
             .TemporalId = 0,
         };
 
