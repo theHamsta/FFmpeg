@@ -306,8 +306,8 @@ static av_cold int vulkan_encode_h265_init_sequence_params(AVCodecContext *avctx
     sps->log2_min_luma_transform_block_size_minus2   = av_log2(enc->min_tbs) - 2;
     sps->log2_diff_max_min_luma_transform_block_size = av_log2(enc->max_tbs) - av_log2(enc->min_tbs);
     // Full transform hierarchy allowed (2-5).
-    sps->max_transform_hierarchy_depth_inter = 4;
-    sps->max_transform_hierarchy_depth_intra = 4;
+    sps->max_transform_hierarchy_depth_inter = 3;
+    sps->max_transform_hierarchy_depth_intra = 3;
     // AMP works.
     sps->amp_enabled_flag = 1;
     sps->sample_adaptive_offset_enabled_flag = 0;
@@ -643,11 +643,11 @@ static int vulkan_encode_h265_init_pic_headers(AVCodecContext *avctx,
         } else if (pic->type == FF_VK_FRAME_P) {
             av_assert0(pic->refs[0]);
             hpic->slice_type     = STD_VIDEO_H265_SLICE_TYPE_P;
-            hpic->pic_type       = STD_VIDEO_H264_PICTURE_TYPE_P;
+            hpic->pic_type       = STD_VIDEO_H265_PICTURE_TYPE_P;
             nal_aud_pic_type  = 1;
         } else {
-            hpic->slice_type = STD_VIDEO_H264_SLICE_TYPE_B;
-            hpic->pic_type   = STD_VIDEO_H264_PICTURE_TYPE_B;
+            hpic->slice_type = STD_VIDEO_H265_SLICE_TYPE_B;
+            hpic->pic_type   = STD_VIDEO_H265_PICTURE_TYPE_B;
             nal_aud_pic_type  = 2;
         }
     }
@@ -768,6 +768,8 @@ static int vulkan_encode_h265_init_pic_headers(AVCodecContext *avctx,
             .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H265_DPB_SLOT_INFO_EXT,
             .pStdReferenceInfo = &hpic->l0ref_info[i],
         };
+
+        pic->ref_data[i] = &hpic->l0refs[i];
     }
 
     hpic->vkh265pic_info = (VkVideoEncodeH265PictureInfoEXT) {

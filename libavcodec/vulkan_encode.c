@@ -865,7 +865,11 @@ static int vulkan_encode_output(AVCodecContext *avctx,
     ff_vk_exec_wait(&ctx->s, pic->exec);
 
     /* Get status */
+again:
     ret = ff_vk_exec_get_query(&ctx->s, pic->exec, (void **)&query_data, &qstatus);
+    if( ret == VK_NOT_READY ) {
+        goto again;
+    }
     if (ret != VK_SUCCESS) {
         av_log(ctx, AV_LOG_ERROR, "Error querying results from encoder: %s!\n",
                ff_vk_ret2str(ret));
@@ -885,7 +889,7 @@ static int vulkan_encode_output(AVCodecContext *avctx,
                query_data[1] /* Data written */;
 
     av_log(ctx, AV_LOG_VERBOSE, "Received a packet, %u bytes large (%u off, %u data), "
-           "status = %i\n", pkt_size, query_data[0], query_data[1], err);
+           "status = %i\n", pkt_size, query_data[0], query_data[1], ret);
 
     if (!(sd_buf->buf.flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) {
         VkMappedMemoryRange invalidate_buf = {
