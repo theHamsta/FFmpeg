@@ -762,6 +762,8 @@ static int vulkan_encode_h264_init_pic_headers(AVCodecContext *avctx,
             .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H264_DPB_SLOT_INFO_EXT,
             .pStdReferenceInfo = &hpic->l0ref_info[i],
         };
+
+        pic->ref_data[i] = &hpic->l0refs[i];
     }
 
     hpic->vkh264pic_info = (VkVideoEncodeH264PictureInfoEXT) {

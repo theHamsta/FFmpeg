@@ -103,6 +103,7 @@ typedef struct FFVulkanEncodePicture {
      * used by later pictures they will also appear in the DPB. */
     struct FFVulkanEncodePicture *refs[MAX_PICTURE_REFERENCES];
     int                           nb_refs;
+    void                         *ref_data[MAX_PICTURE_REFERENCES];
 
     /* Reference count for other pictures referring to this one through
      * the above pointers, directly from incomplete pictures and indirectly
