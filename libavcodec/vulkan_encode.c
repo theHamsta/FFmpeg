@@ -667,7 +667,7 @@ static int vulkan_encode_issue(AVCodecContext *avctx,
         };
         ref_slot[i] = (VkVideoReferenceSlotInfoKHR) {
             .sType = VK_STRUCTURE_TYPE_VIDEO_REFERENCE_SLOT_INFO_KHR,
-            .pNext = NULL,
+            .pNext = pic->ref_data[i],
             .slotIndex = ref->slot,
             .pPictureResource = &ref_pic[i],
         };
@@ -835,7 +835,9 @@ static int vulkan_encode_issue(AVCodecContext *avctx,
     vk->CmdEndVideoCodingKHR(cmd_buf, &encode_end);
 
     /* End recording and submit for execution */
-    ff_vk_exec_submit(&ctx->s, exec);
+    err = ff_vk_exec_submit(&ctx->s, exec);
+    if (err < 0)
+        goto fail;
 
     pic->encode_issued = 1;
     pic->exec = exec;
