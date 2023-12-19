@@ -42,8 +42,8 @@ static const uint8_t vulkan_encode_h264_sei_identifier_uuid[16] = {
 
 typedef struct VulkanEncodeH264Context {
     FFVulkanEncodeContext vkenc;
-    VkVideoEncodeH264ProfileInfoEXT profile;
-    VkVideoEncodeH264CapabilitiesEXT caps;
+    VkVideoEncodeH264ProfileInfoKHR profile;
+    VkVideoEncodeH264CapabilitiesKHR caps;
 
     int bit_rate;
     int output_delay;
@@ -98,14 +98,14 @@ typedef struct VulkanEncodeH264Picture {
 
     StdVideoEncodeH264WeightTable slice_wt;
     StdVideoEncodeH264SliceHeader slice_hdr;
-    VkVideoEncodeH264NaluSliceInfoEXT vkslice;
+    VkVideoEncodeH264NaluSliceInfoKHR vkslice;
     StdVideoEncodeH264PictureInfo h264pic_info;
-    VkVideoEncodeH264PictureInfoEXT vkh264pic_info;
-    VkVideoEncodeH264RateControlInfoEXT vkrc_info;
-    VkVideoEncodeH264RateControlLayerInfoEXT vkrc_layer_info;
+    VkVideoEncodeH264PictureInfoKHR vkh264pic_info;
+    VkVideoEncodeH264RateControlInfoKHR vkrc_info;
+    VkVideoEncodeH264RateControlLayerInfoKHR vkrc_layer_info;
 
-    VkVideoEncodeH264DpbSlotInfoEXT l0refs[37];
-    VkVideoEncodeH264DpbSlotInfoEXT l1refs[37];
+    VkVideoEncodeH264DpbSlotInfoKHR l0refs[37];
+    VkVideoEncodeH264DpbSlotInfoKHR l1refs[37];
     StdVideoEncodeH264ReferenceInfo l0ref_info[37];
     StdVideoEncodeH264ReferenceInfo l1ref_info[37];
 
@@ -554,19 +554,19 @@ static av_cold int vulkan_encode_h264_create_session(AVCodecContext *avctx)
     VulkanEncodeH264Context *enc = avctx->priv_data;
     FFVulkanFunctions *vk = &enc->vkenc.s.vkfn;
 
-    VkVideoEncodeH264SessionParametersAddInfoEXT h264_params_info;
-    VkVideoEncodeH264SessionParametersCreateInfoEXT h264_params;
+    VkVideoEncodeH264SessionParametersAddInfoKHR h264_params_info;
+    VkVideoEncodeH264SessionParametersCreateInfoKHR h264_params;
     VkVideoSessionParametersCreateInfoKHR session_params_create;
 
-    h264_params_info = (VkVideoEncodeH264SessionParametersAddInfoEXT) {
-        .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H264_SESSION_PARAMETERS_ADD_INFO_EXT,
+    h264_params_info = (VkVideoEncodeH264SessionParametersAddInfoKHR) {
+        .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H264_SESSION_PARAMETERS_ADD_INFO_KHR,
         .pStdSPSs = &enc->vksps,
         .stdSPSCount = 1,
         .pStdPPSs = &enc->vkpps,
         .stdPPSCount = 1,
     };
-    h264_params = (VkVideoEncodeH264SessionParametersCreateInfoEXT) {
-        .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H264_SESSION_PARAMETERS_CREATE_INFO_EXT,
+    h264_params = (VkVideoEncodeH264SessionParametersCreateInfoKHR) {
+        .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H264_SESSION_PARAMETERS_CREATE_INFO_KHR,
         .maxStdSPSCount = 1,
         .maxStdPPSCount = 1,
         .pParametersAddInfo = &h264_params_info,
@@ -703,8 +703,8 @@ static int vulkan_encode_h264_init_pic_headers(AVCodecContext *avctx,
         .pWeightTable = &hpic->slice_wt,
     };
 
-    hpic->vkslice = (VkVideoEncodeH264NaluSliceInfoEXT) {
-        .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H264_NALU_SLICE_INFO_EXT,
+    hpic->vkslice = (VkVideoEncodeH264NaluSliceInfoKHR) {
+        .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H264_NALU_SLICE_INFO_KHR,
         .pNext = NULL,
         .pStdSliceHeader = &hpic->slice_hdr,
     };
@@ -758,31 +758,31 @@ static int vulkan_encode_h264_init_pic_headers(AVCodecContext *avctx,
             .long_term_frame_idx = 0,
         };
 
-        hpic->l0refs[i] = (VkVideoEncodeH264DpbSlotInfoEXT) {
-            .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H264_DPB_SLOT_INFO_EXT,
+        hpic->l0refs[i] = (VkVideoEncodeH264DpbSlotInfoKHR) {
+            .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H264_DPB_SLOT_INFO_KHR,
             .pStdReferenceInfo = &hpic->l0ref_info[i],
         };
 
         pic->ref_data[i] = &hpic->l0refs[i];
     }
 
-    hpic->vkh264pic_info = (VkVideoEncodeH264PictureInfoEXT) {
-        .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H264_PICTURE_INFO_EXT,
+    hpic->vkh264pic_info = (VkVideoEncodeH264PictureInfoKHR) {
+        .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H264_PICTURE_INFO_KHR,
         .pNext = NULL,
         .naluSliceEntryCount = 1,
         .pNaluSliceEntries = &hpic->vkslice,
         .pStdPictureInfo = &hpic->h264pic_info,
     };
 
-    hpic->vkrc_info = (VkVideoEncodeH264RateControlInfoEXT) {
-        .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H264_RATE_CONTROL_INFO_EXT,
+    hpic->vkrc_info = (VkVideoEncodeH264RateControlInfoKHR) {
+        .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H264_RATE_CONTROL_INFO_KHR,
         .temporalLayerCount = 1,
     };
 
-    hpic->vkrc_layer_info = (VkVideoEncodeH264RateControlLayerInfoEXT) {
-        .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H264_RATE_CONTROL_LAYER_INFO_EXT,
-        .minQp = (VkVideoEncodeH264QpEXT){ qp, qp, qp },
-        .maxQp = (VkVideoEncodeH264QpEXT){ qp, qp, qp },
+    hpic->vkrc_layer_info = (VkVideoEncodeH264RateControlLayerInfoKHR) {
+        .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H264_RATE_CONTROL_LAYER_INFO_KHR,
+        .minQp = (VkVideoEncodeH264QpKHR){ qp, qp, qp },
+        .maxQp = (VkVideoEncodeH264QpKHR){ qp, qp, qp },
         .useMinQp = 1,
         .useMaxQp = 1,
     };
@@ -866,13 +866,13 @@ static av_cold int vulkan_encode_h264_init(AVCodecContext *avctx)
     int err;
     VulkanEncodeH264Context *enc = avctx->priv_data;
 
-    enc->profile = (VkVideoEncodeH264ProfileInfoEXT) {
-        .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H264_PROFILE_INFO_EXT,
+    enc->profile = (VkVideoEncodeH264ProfileInfoKHR) {
+        .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H264_PROFILE_INFO_KHR,
         .stdProfileIdc = enc->vkenc.opts.profile,
     };
 
-    enc->caps = (VkVideoEncodeH264CapabilitiesEXT) {
-        .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H264_CAPABILITIES_EXT,
+    enc->caps = (VkVideoEncodeH264CapabilitiesKHR) {
+        .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H264_CAPABILITIES_KHR,
     };
 
     err = ff_cbs_init(&enc->cbc, AV_CODEC_ID_H264, avctx);
@@ -899,64 +899,64 @@ static av_cold int vulkan_encode_h264_init(AVCodecContext *avctx)
     av_log(avctx, AV_LOG_VERBOSE, "H264 encoder capabilities:\n");
     av_log(avctx, AV_LOG_VERBOSE, "    Standard capability flags:\n");
     av_log(avctx, AV_LOG_VERBOSE, "        separate_color_plane: %i\n",
-           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H264_STD_SEPARATE_COLOR_PLANE_FLAG_SET_BIT_EXT));
+           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H264_STD_SEPARATE_COLOR_PLANE_FLAG_SET_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        qprime_y_zero_transform_bypass: %i\n",
-           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H264_STD_QPPRIME_Y_ZERO_TRANSFORM_BYPASS_FLAG_SET_BIT_EXT));
+           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H264_STD_QPPRIME_Y_ZERO_TRANSFORM_BYPASS_FLAG_SET_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        scaling_lists: %i\n",
-           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H264_STD_SCALING_MATRIX_PRESENT_FLAG_SET_BIT_EXT));
+           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H264_STD_SCALING_MATRIX_PRESENT_FLAG_SET_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        chroma_qp_index_offset: %i\n",
-           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H264_STD_CHROMA_QP_INDEX_OFFSET_BIT_EXT));
+           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H264_STD_CHROMA_QP_INDEX_OFFSET_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        second_chroma_qp_index_offset: %i\n",
-           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H264_STD_SECOND_CHROMA_QP_INDEX_OFFSET_BIT_EXT));
+           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H264_STD_SECOND_CHROMA_QP_INDEX_OFFSET_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        pic_init_qp: %i\n",
-           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H264_STD_PIC_INIT_QP_MINUS26_BIT_EXT));
+           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H264_STD_PIC_INIT_QP_MINUS26_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        weighted:%s%s%s\n",
-           enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H264_STD_WEIGHTED_PRED_FLAG_SET_BIT_EXT ?
+           enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H264_STD_WEIGHTED_PRED_FLAG_SET_BIT_KHR ?
                " pred" : "",
-           enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H264_STD_WEIGHTED_BIPRED_IDC_EXPLICIT_BIT_EXT ?
+           enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H264_STD_WEIGHTED_BIPRED_IDC_EXPLICIT_BIT_KHR ?
                " bipred_explicit" : "",
-           enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H264_STD_WEIGHTED_BIPRED_IDC_IMPLICIT_BIT_EXT ?
+           enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H264_STD_WEIGHTED_BIPRED_IDC_IMPLICIT_BIT_KHR ?
                " bipred_implicit" : "");
     av_log(avctx, AV_LOG_VERBOSE, "        8x8_transforms: %i\n",
-           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H264_STD_TRANSFORM_8X8_MODE_FLAG_SET_BIT_EXT));
+           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H264_STD_TRANSFORM_8X8_MODE_FLAG_SET_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        disable_direct_spatial_mv_pred: %i\n",
-           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H264_STD_DIRECT_SPATIAL_MV_PRED_FLAG_UNSET_BIT_EXT));
+           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H264_STD_DIRECT_SPATIAL_MV_PRED_FLAG_UNSET_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        coder:%s%s\n",
-           enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H264_STD_ENTROPY_CODING_MODE_FLAG_UNSET_BIT_EXT ?
+           enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H264_STD_ENTROPY_CODING_MODE_FLAG_UNSET_BIT_KHR ?
                " cabac" : "",
-           enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H264_STD_ENTROPY_CODING_MODE_FLAG_SET_BIT_EXT ?
+           enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H264_STD_ENTROPY_CODING_MODE_FLAG_SET_BIT_KHR ?
                " cavlc" : "");
     av_log(avctx, AV_LOG_VERBOSE, "        direct_8x8_inference: %i\n",
-           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H264_STD_DIRECT_8X8_INFERENCE_FLAG_UNSET_BIT_EXT));
+           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H264_STD_DIRECT_8X8_INFERENCE_FLAG_UNSET_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        constrained_intra_pred: %i\n",
-           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H264_STD_CONSTRAINED_INTRA_PRED_FLAG_SET_BIT_EXT));
+           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H264_STD_CONSTRAINED_INTRA_PRED_FLAG_SET_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        deblock:%s%s%s\n",
-           enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H264_STD_DEBLOCKING_FILTER_DISABLED_BIT_EXT ?
+           enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H264_STD_DEBLOCKING_FILTER_DISABLED_BIT_KHR ?
                " filter_disabling" : "",
-           enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H264_STD_DEBLOCKING_FILTER_ENABLED_BIT_EXT ?
+           enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H264_STD_DEBLOCKING_FILTER_ENABLED_BIT_KHR ?
                " filter_enabling" : "",
-           enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H264_STD_DEBLOCKING_FILTER_PARTIAL_BIT_EXT ?
+           enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H264_STD_DEBLOCKING_FILTER_PARTIAL_BIT_KHR ?
                " filter_partial" : "");
 
     av_log(avctx, AV_LOG_VERBOSE, "    Capability flags:\n");
     av_log(avctx, AV_LOG_VERBOSE, "        hdr_compliance: %i\n",
-           !!(enc->caps.flags & VK_VIDEO_ENCODE_H264_CAPABILITY_HRD_COMPLIANCE_BIT_EXT));
+           !!(enc->caps.flags & VK_VIDEO_ENCODE_H264_CAPABILITY_HRD_COMPLIANCE_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        pred_weight_table_generated: %i\n",
-           !!(enc->caps.flags & VK_VIDEO_ENCODE_H264_CAPABILITY_PREDICTION_WEIGHT_TABLE_GENERATED_BIT_EXT));
+           !!(enc->caps.flags & VK_VIDEO_ENCODE_H264_CAPABILITY_PREDICTION_WEIGHT_TABLE_GENERATED_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        row_unaligned_slice: %i\n",
-           !!(enc->caps.flags & VK_VIDEO_ENCODE_H264_CAPABILITY_ROW_UNALIGNED_SLICE_BIT_EXT));
+           !!(enc->caps.flags & VK_VIDEO_ENCODE_H264_CAPABILITY_ROW_UNALIGNED_SLICE_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        different_slice_type: %i\n",
-           !!(enc->caps.flags & VK_VIDEO_ENCODE_H264_CAPABILITY_DIFFERENT_SLICE_TYPE_BIT_EXT));
+           !!(enc->caps.flags & VK_VIDEO_ENCODE_H264_CAPABILITY_DIFFERENT_SLICE_TYPE_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        b_frame_in_l0_list: %i\n",
-           !!(enc->caps.flags & VK_VIDEO_ENCODE_H264_CAPABILITY_B_FRAME_IN_L0_LIST_BIT_EXT));
+           !!(enc->caps.flags & VK_VIDEO_ENCODE_H264_CAPABILITY_B_FRAME_IN_L0_LIST_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        b_frame_in_l1_list: %i\n",
-           !!(enc->caps.flags & VK_VIDEO_ENCODE_H264_CAPABILITY_B_FRAME_IN_L1_LIST_BIT_EXT));
+           !!(enc->caps.flags & VK_VIDEO_ENCODE_H264_CAPABILITY_B_FRAME_IN_L1_LIST_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        per_pict_type_min_max_qp: %i\n",
-           !!(enc->caps.flags & VK_VIDEO_ENCODE_H264_CAPABILITY_PER_PICTURE_TYPE_MIN_MAX_QP_BIT_EXT));
+           !!(enc->caps.flags & VK_VIDEO_ENCODE_H264_CAPABILITY_PER_PICTURE_TYPE_MIN_MAX_QP_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        per_slice_constant_qp: %i\n",
-           !!(enc->caps.flags & VK_VIDEO_ENCODE_H264_CAPABILITY_PER_SLICE_CONSTANT_QP_BIT_EXT));
+           !!(enc->caps.flags & VK_VIDEO_ENCODE_H264_CAPABILITY_PER_SLICE_CONSTANT_QP_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        generate_prefix_nalu: %i\n",
-           !!(enc->caps.flags & VK_VIDEO_ENCODE_H264_CAPABILITY_GENERATE_PREFIX_NALU_BIT_EXT));
+           !!(enc->caps.flags & VK_VIDEO_ENCODE_H264_CAPABILITY_GENERATE_PREFIX_NALU_BIT_KHR));
 
     av_log(avctx, AV_LOG_VERBOSE, "    Capabilities:\n");
     av_log(avctx, AV_LOG_VERBOSE, "        maxLevelIdc: %i\n",

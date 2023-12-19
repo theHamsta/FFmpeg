@@ -33,8 +33,8 @@ enum UnitElems {
 
 typedef struct VulkanEncodeH265Context {
     FFVulkanEncodeContext vkenc;
-    VkVideoEncodeH265ProfileInfoEXT profile;
-    VkVideoEncodeH265CapabilitiesEXT caps;
+    VkVideoEncodeH265ProfileInfoKHR profile;
+    VkVideoEncodeH265CapabilitiesKHR caps;
 
     int bit_rate;
     int output_delay;
@@ -96,14 +96,14 @@ typedef struct VulkanEncodeH265Picture {
 
     StdVideoEncodeH265WeightTable slice_wt;
     StdVideoEncodeH265SliceSegmentHeader slice_segment_hdr;
-    VkVideoEncodeH265NaluSliceSegmentInfoEXT vkslice;
+    VkVideoEncodeH265NaluSliceSegmentInfoKHR vkslice;
     StdVideoEncodeH265PictureInfo h265pic_info;
-    VkVideoEncodeH265PictureInfoEXT vkh265pic_info;
-    VkVideoEncodeH265RateControlInfoEXT vkrc_info;
-    VkVideoEncodeH265RateControlLayerInfoEXT vkrc_layer_info;
+    VkVideoEncodeH265PictureInfoKHR vkh265pic_info;
+    VkVideoEncodeH265RateControlInfoKHR vkrc_info;
+    VkVideoEncodeH265RateControlLayerInfoKHR vkrc_layer_info;
 
-    VkVideoEncodeH265DpbSlotInfoEXT l0refs[37];
-    VkVideoEncodeH265DpbSlotInfoEXT l1refs[37];
+    VkVideoEncodeH265DpbSlotInfoKHR l0refs[37];
+    VkVideoEncodeH265DpbSlotInfoKHR l1refs[37];
     StdVideoEncodeH265ReferenceInfo l0ref_info[37];
     StdVideoEncodeH265ReferenceInfo l1ref_info[37];
 
@@ -311,7 +311,7 @@ static av_cold int vulkan_encode_h265_init_sequence_params(AVCodecContext *avctx
     // AMP works.
     sps->amp_enabled_flag = 1;
     sps->sample_adaptive_offset_enabled_flag = 0;
-    if (enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_SAMPLE_ADAPTIVE_OFFSET_ENABLED_FLAG_SET_BIT_EXT)
+    if (enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_SAMPLE_ADAPTIVE_OFFSET_ENABLED_FLAG_SET_BIT_KHR)
         sps->sample_adaptive_offset_enabled_flag = 1;
     sps->sps_temporal_mvp_enabled_flag       = 0;
     sps->pcm_enabled_flag = 0;
@@ -395,12 +395,12 @@ static av_cold int vulkan_encode_h265_init_sequence_params(AVCodecContext *avctx
     pps->cu_qp_delta_enabled_flag = 0;//(ctx->va_rc_mode != VA_RC_CQP);
     pps->diff_cu_qp_delta_depth   = 0;
 
-    if (enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_TRANSFORM_SKIP_ENABLED_FLAG_SET_BIT_EXT)
+    if (enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_TRANSFORM_SKIP_ENABLED_FLAG_SET_BIT_KHR)
         pps->transform_skip_enabled_flag = 1;
 
     pps->pps_loop_filter_across_slices_enabled_flag = 0;
     pps->deblocking_filter_control_present_flag = 1;
-    if (enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_CONSTRAINED_INTRA_PRED_FLAG_SET_BIT_EXT)
+    if (enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_CONSTRAINED_INTRA_PRED_FLAG_SET_BIT_KHR)
         pps->constrained_intra_pred_flag = 1;
     //    pps->diff_cu_qp_delta_depth = sps->log2_diff_max_min_luma_coding_block_size;
 
@@ -574,12 +574,12 @@ static av_cold int vulkan_encode_h265_create_session(AVCodecContext *avctx)
     VulkanEncodeH265Context *enc = avctx->priv_data;
     FFVulkanFunctions *vk = &enc->vkenc.s.vkfn;
 
-    VkVideoEncodeH265SessionParametersAddInfoEXT h265_params_info;
-    VkVideoEncodeH265SessionParametersCreateInfoEXT h265_params;
+    VkVideoEncodeH265SessionParametersAddInfoKHR h265_params_info;
+    VkVideoEncodeH265SessionParametersCreateInfoKHR h265_params;
     VkVideoSessionParametersCreateInfoKHR session_params_create;
 
-    h265_params_info = (VkVideoEncodeH265SessionParametersAddInfoEXT) {
-        .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H265_SESSION_PARAMETERS_ADD_INFO_EXT,
+    h265_params_info = (VkVideoEncodeH265SessionParametersAddInfoKHR) {
+        .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H265_SESSION_PARAMETERS_ADD_INFO_KHR,
         .pStdSPSs = &enc->vksps,
         .stdSPSCount = 1,
         .pStdPPSs = &enc->vkpps,
@@ -587,8 +587,8 @@ static av_cold int vulkan_encode_h265_create_session(AVCodecContext *avctx)
         .pStdVPSs = &enc->vkvps,
         .stdVPSCount = 1,
     };
-    h265_params = (VkVideoEncodeH265SessionParametersCreateInfoEXT) {
-        .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H265_SESSION_PARAMETERS_CREATE_INFO_EXT,
+    h265_params = (VkVideoEncodeH265SessionParametersCreateInfoKHR) {
+        .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H265_SESSION_PARAMETERS_CREATE_INFO_KHR,
         .maxStdSPSCount = 1,
         .maxStdPPSCount = 1,
         .maxStdVPSCount = 1,
@@ -715,8 +715,8 @@ static int vulkan_encode_h265_init_pic_headers(AVCodecContext *avctx,
         .pWeightTable = &hpic->slice_wt,
     };
 
-    hpic->vkslice = (VkVideoEncodeH265NaluSliceSegmentInfoEXT) {
-        .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H265_NALU_SLICE_SEGMENT_INFO_EXT,
+    hpic->vkslice = (VkVideoEncodeH265NaluSliceSegmentInfoKHR) {
+        .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H265_NALU_SLICE_SEGMENT_INFO_KHR,
         .pNext = NULL,
         .pStdSliceSegmentHeader = &hpic->slice_segment_hdr,
     };
@@ -764,29 +764,29 @@ static int vulkan_encode_h265_init_pic_headers(AVCodecContext *avctx,
             .TemporalId = 0,
         };
 
-        hpic->l0refs[i] = (VkVideoEncodeH265DpbSlotInfoEXT) {
-            .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H265_DPB_SLOT_INFO_EXT,
+        hpic->l0refs[i] = (VkVideoEncodeH265DpbSlotInfoKHR) {
+            .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H265_DPB_SLOT_INFO_KHR,
             .pStdReferenceInfo = &hpic->l0ref_info[i],
         };
     }
 
-    hpic->vkh265pic_info = (VkVideoEncodeH265PictureInfoEXT) {
-        .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H265_PICTURE_INFO_EXT,
+    hpic->vkh265pic_info = (VkVideoEncodeH265PictureInfoKHR) {
+        .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H265_PICTURE_INFO_KHR,
         .pNext = NULL,
         .naluSliceSegmentEntryCount = 1,
         .pNaluSliceSegmentEntries = &hpic->vkslice,
         .pStdPictureInfo = &hpic->h265pic_info,
     };
 
-    hpic->vkrc_info = (VkVideoEncodeH265RateControlInfoEXT) {
-        .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H265_RATE_CONTROL_INFO_EXT,
+    hpic->vkrc_info = (VkVideoEncodeH265RateControlInfoKHR) {
+        .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H265_RATE_CONTROL_INFO_KHR,
     };
 
-    hpic->vkrc_layer_info = (VkVideoEncodeH265RateControlLayerInfoEXT) {
-        .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H265_RATE_CONTROL_LAYER_INFO_EXT,
+    hpic->vkrc_layer_info = (VkVideoEncodeH265RateControlLayerInfoKHR) {
+        .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H265_RATE_CONTROL_LAYER_INFO_KHR,
         .pNext = NULL,
-        .minQp = (VkVideoEncodeH265QpEXT){ qp, qp, qp },
-        .maxQp = (VkVideoEncodeH265QpEXT){ qp, qp, qp },
+        .minQp = (VkVideoEncodeH265QpKHR){ qp, qp, qp },
+        .maxQp = (VkVideoEncodeH265QpKHR){ qp, qp, qp },
         .useMinQp = 1,
         .useMaxQp = 1,
     };
@@ -870,13 +870,13 @@ static av_cold int vulkan_encode_h265_init(AVCodecContext *avctx)
     if (avctx->level == FF_LEVEL_UNKNOWN)
         avctx->level = enc->level;
 
-    enc->profile = (VkVideoEncodeH265ProfileInfoEXT) {
-        .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H265_PROFILE_INFO_EXT,
+    enc->profile = (VkVideoEncodeH265ProfileInfoKHR) {
+        .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H265_PROFILE_INFO_KHR,
         .stdProfileIdc = enc->vkenc.opts.profile,
     };
 
-    enc->caps = (VkVideoEncodeH265CapabilitiesEXT) {
-        .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H265_CAPABILITIES_EXT,
+    enc->caps = (VkVideoEncodeH265CapabilitiesKHR) {
+        .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H265_CAPABILITIES_KHR,
     };
 
     err = ff_cbs_init(&enc->cbc, AV_CODEC_ID_H265, avctx);
@@ -900,61 +900,61 @@ static av_cold int vulkan_encode_h265_init(AVCodecContext *avctx)
     av_log(avctx, AV_LOG_VERBOSE, "H265 encoder capabilities:\n");
     av_log(avctx, AV_LOG_VERBOSE, "    Standard capability flags:\n");
     av_log(avctx, AV_LOG_VERBOSE, "        separate_color_plane: %i\n",
-           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_SEPARATE_COLOR_PLANE_FLAG_SET_BIT_EXT));
+           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_SEPARATE_COLOR_PLANE_FLAG_SET_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        sample_adaptive: %i\n",
-           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_SAMPLE_ADAPTIVE_OFFSET_ENABLED_FLAG_SET_BIT_EXT));
+           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_SAMPLE_ADAPTIVE_OFFSET_ENABLED_FLAG_SET_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        scaling_lists: %i\n",
-           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_SCALING_LIST_DATA_PRESENT_FLAG_SET_BIT_EXT));
+           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_SCALING_LIST_DATA_PRESENT_FLAG_SET_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        pcm_enabled: %i\n",
-           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_PCM_ENABLED_FLAG_SET_BIT_EXT));
+           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_PCM_ENABLED_FLAG_SET_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        sps_temporal_mvp_enabled: %i\n",
-           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_SPS_TEMPORAL_MVP_ENABLED_FLAG_SET_BIT_EXT));
+           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_SPS_TEMPORAL_MVP_ENABLED_FLAG_SET_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        init_qp_minus26: %i\n",
-           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_INIT_QP_MINUS26_BIT_EXT));
+           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_INIT_QP_MINUS26_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        weighted:%s%s\n",
-           enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_WEIGHTED_PRED_FLAG_SET_BIT_EXT ?
+           enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_WEIGHTED_PRED_FLAG_SET_BIT_KHR ?
                " pred" : "",
-           enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_WEIGHTED_BIPRED_FLAG_SET_BIT_EXT ?
+           enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_WEIGHTED_BIPRED_FLAG_SET_BIT_KHR ?
 	   " bipred" : "");
     av_log(avctx, AV_LOG_VERBOSE, "        log2_parallel_merge_level_minus2: %i\n",
-           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_LOG2_PARALLEL_MERGE_LEVEL_MINUS2_BIT_EXT));
+           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_LOG2_PARALLEL_MERGE_LEVEL_MINUS2_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        sign_data_hiding_enabled: %i\n",
-           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_SIGN_DATA_HIDING_ENABLED_FLAG_SET_BIT_EXT));
+           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_SIGN_DATA_HIDING_ENABLED_FLAG_SET_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        transform_skip_enabled_set: %d\n",
-           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_TRANSFORM_SKIP_ENABLED_FLAG_SET_BIT_EXT));
+           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_TRANSFORM_SKIP_ENABLED_FLAG_SET_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        transform_skip_enabled_unset: %d\n",
-           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_TRANSFORM_SKIP_ENABLED_FLAG_UNSET_BIT_EXT));
+           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_TRANSFORM_SKIP_ENABLED_FLAG_UNSET_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        pps_slice_chroma_qp_offsets_present: %d\n",
-           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_PPS_SLICE_CHROMA_QP_OFFSETS_PRESENT_FLAG_SET_BIT_EXT));
+           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_PPS_SLICE_CHROMA_QP_OFFSETS_PRESENT_FLAG_SET_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        transquant_bypass_enabled: %d\n",
-           !!(enc->caps.stdSyntaxFlags &  VK_VIDEO_ENCODE_H265_STD_TRANSQUANT_BYPASS_ENABLED_FLAG_SET_BIT_EXT));
+           !!(enc->caps.stdSyntaxFlags &  VK_VIDEO_ENCODE_H265_STD_TRANSQUANT_BYPASS_ENABLED_FLAG_SET_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        constrained_intra_pred: %i\n",
-           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_CONSTRAINED_INTRA_PRED_FLAG_SET_BIT_EXT));
+           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_CONSTRAINED_INTRA_PRED_FLAG_SET_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        entropy_coding_sync_enabled: %i\n",
-           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_ENTROPY_CODING_SYNC_ENABLED_FLAG_SET_BIT_EXT));
+           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_ENTROPY_CODING_SYNC_ENABLED_FLAG_SET_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        deblocking_filter_override_enabled: %i\n",
-           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_DEBLOCKING_FILTER_OVERRIDE_ENABLED_FLAG_SET_BIT_EXT));
+           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_DEBLOCKING_FILTER_OVERRIDE_ENABLED_FLAG_SET_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        dependent_slice_segments_enabled: %i\n",
-           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_DEPENDENT_SLICE_SEGMENTS_ENABLED_FLAG_SET_BIT_EXT));
+           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_DEPENDENT_SLICE_SEGMENTS_ENABLED_FLAG_SET_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        dependent_slice_segment: %i\n",
-           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_DEPENDENT_SLICE_SEGMENT_FLAG_SET_BIT_EXT));
+           !!(enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_DEPENDENT_SLICE_SEGMENT_FLAG_SET_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "    Capability flags:\n");
     av_log(avctx, AV_LOG_VERBOSE, "        hrd_compliance: %i\n",
-           !!(enc->caps.flags & VK_VIDEO_ENCODE_H265_CAPABILITY_HRD_COMPLIANCE_BIT_EXT));
+           !!(enc->caps.flags & VK_VIDEO_ENCODE_H265_CAPABILITY_HRD_COMPLIANCE_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        pred_weight_table_generated: %i\n",
-           !!(enc->caps.flags & VK_VIDEO_ENCODE_H265_CAPABILITY_PREDICTION_WEIGHT_TABLE_GENERATED_BIT_EXT));
+           !!(enc->caps.flags & VK_VIDEO_ENCODE_H265_CAPABILITY_PREDICTION_WEIGHT_TABLE_GENERATED_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        row_unaligned_slice_segment: %i\n",
-           !!(enc->caps.flags & VK_VIDEO_ENCODE_H265_CAPABILITY_ROW_UNALIGNED_SLICE_SEGMENT_BIT_EXT));
+           !!(enc->caps.flags & VK_VIDEO_ENCODE_H265_CAPABILITY_ROW_UNALIGNED_SLICE_SEGMENT_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        different_slice_segment_type: %i\n",
-           !!(enc->caps.flags & VK_VIDEO_ENCODE_H265_CAPABILITY_DIFFERENT_SLICE_SEGMENT_TYPE_BIT_EXT));
+           !!(enc->caps.flags & VK_VIDEO_ENCODE_H265_CAPABILITY_DIFFERENT_SLICE_SEGMENT_TYPE_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        b_frame_in_l0_list: %i\n",
-           !!(enc->caps.flags & VK_VIDEO_ENCODE_H265_CAPABILITY_B_FRAME_IN_L0_LIST_BIT_EXT));
+           !!(enc->caps.flags & VK_VIDEO_ENCODE_H265_CAPABILITY_B_FRAME_IN_L0_LIST_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        b_frame_in_l1_list: %i\n",
-           !!(enc->caps.flags & VK_VIDEO_ENCODE_H265_CAPABILITY_B_FRAME_IN_L1_LIST_BIT_EXT));
+           !!(enc->caps.flags & VK_VIDEO_ENCODE_H265_CAPABILITY_B_FRAME_IN_L1_LIST_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        per_pict_type_min_max_qp: %i\n",
-           !!(enc->caps.flags & VK_VIDEO_ENCODE_H265_CAPABILITY_PER_PICTURE_TYPE_MIN_MAX_QP_BIT_EXT));
+           !!(enc->caps.flags & VK_VIDEO_ENCODE_H265_CAPABILITY_PER_PICTURE_TYPE_MIN_MAX_QP_BIT_KHR));
     av_log(avctx, AV_LOG_VERBOSE, "        per_slice_segment_constant_qp: %i\n",
-           !!(enc->caps.flags & VK_VIDEO_ENCODE_H265_CAPABILITY_PER_SLICE_SEGMENT_CONSTANT_QP_BIT_EXT));
+           !!(enc->caps.flags & VK_VIDEO_ENCODE_H265_CAPABILITY_PER_SLICE_SEGMENT_CONSTANT_QP_BIT_KHR));
 
     av_log(avctx, AV_LOG_VERBOSE, "    Capabilities:\n");
     av_log(avctx, AV_LOG_VERBOSE, "        maxLevelIdc: %i\n",
@@ -980,39 +980,39 @@ static av_cold int vulkan_encode_h265_init(AVCodecContext *avctx)
     enc->max_cb = 0;
 
     /* coding blocks from 8x8 to max CTB size. */
-    if (enc->caps.ctbSizes & VK_VIDEO_ENCODE_H265_CTB_SIZE_16_BIT_EXT)
+    if (enc->caps.ctbSizes & VK_VIDEO_ENCODE_H265_CTB_SIZE_16_BIT_KHR)
         enc->min_ctb = 16;
-    else if (enc->caps.ctbSizes & VK_VIDEO_ENCODE_H265_CTB_SIZE_32_BIT_EXT)
+    else if (enc->caps.ctbSizes & VK_VIDEO_ENCODE_H265_CTB_SIZE_32_BIT_KHR)
         enc->min_ctb = 32;
-    else if (enc->caps.ctbSizes & VK_VIDEO_ENCODE_H265_CTB_SIZE_64_BIT_EXT)
+    else if (enc->caps.ctbSizes & VK_VIDEO_ENCODE_H265_CTB_SIZE_64_BIT_KHR)
         enc->min_ctb = 64;
 
     /* coding blocks from 8x8 to max CTB size. */
-    if (enc->caps.ctbSizes & VK_VIDEO_ENCODE_H265_CTB_SIZE_16_BIT_EXT)
+    if (enc->caps.ctbSizes & VK_VIDEO_ENCODE_H265_CTB_SIZE_16_BIT_KHR)
         enc->max_cb = 16;
-    if (enc->caps.ctbSizes & VK_VIDEO_ENCODE_H265_CTB_SIZE_32_BIT_EXT)
+    if (enc->caps.ctbSizes & VK_VIDEO_ENCODE_H265_CTB_SIZE_32_BIT_KHR)
         enc->max_cb = 32;
-    if (enc->caps.ctbSizes & VK_VIDEO_ENCODE_H265_CTB_SIZE_64_BIT_EXT)
+    if (enc->caps.ctbSizes & VK_VIDEO_ENCODE_H265_CTB_SIZE_64_BIT_KHR)
         enc->max_cb = 64;
 
     enc->min_tbs = 0;
     enc->max_tbs = 0;
-    if (enc->caps.transformBlockSizes & VK_VIDEO_ENCODE_H265_TRANSFORM_BLOCK_SIZE_4_BIT_EXT)
+    if (enc->caps.transformBlockSizes & VK_VIDEO_ENCODE_H265_TRANSFORM_BLOCK_SIZE_4_BIT_KHR)
         enc->min_tbs = 4;
-    else if (enc->caps.transformBlockSizes & VK_VIDEO_ENCODE_H265_TRANSFORM_BLOCK_SIZE_8_BIT_EXT)
+    else if (enc->caps.transformBlockSizes & VK_VIDEO_ENCODE_H265_TRANSFORM_BLOCK_SIZE_8_BIT_KHR)
         enc->min_tbs = 8;
-    else if (enc->caps.transformBlockSizes & VK_VIDEO_ENCODE_H265_TRANSFORM_BLOCK_SIZE_16_BIT_EXT)
+    else if (enc->caps.transformBlockSizes & VK_VIDEO_ENCODE_H265_TRANSFORM_BLOCK_SIZE_16_BIT_KHR)
         enc->min_tbs = 16;
-    else if (enc->caps.transformBlockSizes & VK_VIDEO_ENCODE_H265_TRANSFORM_BLOCK_SIZE_32_BIT_EXT)
+    else if (enc->caps.transformBlockSizes & VK_VIDEO_ENCODE_H265_TRANSFORM_BLOCK_SIZE_32_BIT_KHR)
         enc->min_tbs = 32;
 
-    if (enc->caps.transformBlockSizes & VK_VIDEO_ENCODE_H265_TRANSFORM_BLOCK_SIZE_4_BIT_EXT)
+    if (enc->caps.transformBlockSizes & VK_VIDEO_ENCODE_H265_TRANSFORM_BLOCK_SIZE_4_BIT_KHR)
         enc->max_tbs = 4;
-    if (enc->caps.transformBlockSizes & VK_VIDEO_ENCODE_H265_TRANSFORM_BLOCK_SIZE_8_BIT_EXT)
+    if (enc->caps.transformBlockSizes & VK_VIDEO_ENCODE_H265_TRANSFORM_BLOCK_SIZE_8_BIT_KHR)
         enc->max_tbs = 8;
-    if (enc->caps.transformBlockSizes & VK_VIDEO_ENCODE_H265_TRANSFORM_BLOCK_SIZE_16_BIT_EXT)
+    if (enc->caps.transformBlockSizes & VK_VIDEO_ENCODE_H265_TRANSFORM_BLOCK_SIZE_16_BIT_KHR)
         enc->max_tbs = 16;
-    if (enc->caps.transformBlockSizes & VK_VIDEO_ENCODE_H265_TRANSFORM_BLOCK_SIZE_32_BIT_EXT)
+    if (enc->caps.transformBlockSizes & VK_VIDEO_ENCODE_H265_TRANSFORM_BLOCK_SIZE_32_BIT_KHR)
         enc->max_tbs = 32;
 
     av_assert0(enc->min_ctb);
