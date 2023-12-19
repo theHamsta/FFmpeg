@@ -55,13 +55,9 @@ static inline uint64_t ff_vk_extensions_to_mask(const char * const *extensions,
         { VK_KHR_VIDEO_QUEUE_EXTENSION_NAME,               FF_VK_EXT_VIDEO_QUEUE            },
         { VK_KHR_VIDEO_ENCODE_QUEUE_EXTENSION_NAME,        FF_VK_EXT_VIDEO_ENCODE_QUEUE     },
         { VK_KHR_VIDEO_DECODE_QUEUE_EXTENSION_NAME,        FF_VK_EXT_VIDEO_DECODE_QUEUE     },
-#if CONFIG_VULKAN_ENCODE
-        { VK_EXT_VIDEO_ENCODE_H264_EXTENSION_NAME,         FF_VK_EXT_VIDEO_ENCODE_H264      },
-#endif
+        { VK_KHR_VIDEO_ENCODE_H264_EXTENSION_NAME,         FF_VK_EXT_VIDEO_ENCODE_H264      },
         { VK_KHR_VIDEO_DECODE_H264_EXTENSION_NAME,         FF_VK_EXT_VIDEO_DECODE_H264      },
-#if CONFIG_VULKAN_ENCODE
-        { VK_EXT_VIDEO_ENCODE_H265_EXTENSION_NAME,         FF_VK_EXT_VIDEO_ENCODE_H265      },
-#endif
+        { VK_KHR_VIDEO_ENCODE_H265_EXTENSION_NAME,         FF_VK_EXT_VIDEO_ENCODE_H265      },
         { VK_KHR_VIDEO_DECODE_H265_EXTENSION_NAME,         FF_VK_EXT_VIDEO_DECODE_H265      },
         { "VK_MESA_video_decode_av1",                      FF_VK_EXT_VIDEO_DECODE_AV1       },
     };

@@ -353,7 +353,6 @@ External library support:
   --disable-vdpau          disable Nvidia Video Decode and Presentation API for Unix code [autodetect]
   --disable-videotoolbox   disable VideoToolbox code [autodetect]
   --disable-vulkan         disable Vulkan code [autodetect]
-  --enable-vulkan-encode   enable Vulkan encoding code [no]
 
 Toolchain options:
   --arch=ARCH              select architecture [$arch]
@@ -1957,7 +1956,6 @@ HWACCEL_LIBRARY_LIST="
     mmal
     omx
     opencl
-    vulkan_encode
 "
 
 DOCUMENT_LIST="
@@ -2561,7 +2559,6 @@ CONFIG_EXTRA="
     vp56dsp
     vp8dsp
     wma_freqs
-    vulkan_encode
     wmv2dsp
 "
 
@@ -3191,7 +3188,6 @@ qsvenc_select="qsv"
 qsvvpp_select="qsv"
 vaapi_encode_deps="vaapi"
 v4l2_m2m_deps="linux_videodev2_h sem_timedwait"
-vulkan_encode_deps="vulkan"
 
 bilateral_cuda_filter_deps="ffnvcodec"
 bilateral_cuda_filter_deps_any="cuda_nvcc cuda_llvm"
@@ -3244,7 +3240,7 @@ h264_qsv_encoder_select="atsc_a53 qsvenc"
 h264_rkmpp_decoder_deps="rkmpp"
 h264_rkmpp_decoder_select="h264_mp4toannexb_bsf"
 h264_vaapi_encoder_select="atsc_a53 cbs_h264 vaapi_encode"
-h264_vulkan_encoder_select="cbs_h264 vulkan_encode"
+h264_vulkan_encoder_select="cbs_h264 vulkan"
 h264_v4l2m2m_decoder_deps="v4l2_m2m h264_v4l2_m2m"
 h264_v4l2m2m_decoder_select="h264_mp4toannexb_bsf"
 h264_v4l2m2m_encoder_deps="v4l2_m2m h264_v4l2_m2m"
@@ -3264,7 +3260,7 @@ hevc_rkmpp_decoder_deps="rkmpp"
 hevc_rkmpp_decoder_select="hevc_mp4toannexb_bsf"
 hevc_vaapi_encoder_deps="VAEncPictureParameterBufferHEVC"
 hevc_vaapi_encoder_select="atsc_a53 cbs_h265 vaapi_encode"
-hevc_vulkan_encoder_select="cbs_h265 vulkan_encode"
+hevc_vulkan_encoder_select="cbs_h265 vulkan"
 hevc_v4l2m2m_decoder_deps="v4l2_m2m hevc_v4l2_m2m"
 hevc_v4l2m2m_decoder_select="hevc_mp4toannexb_bsf"
 hevc_v4l2m2m_encoder_deps="v4l2_m2m hevc_v4l2_m2m"
