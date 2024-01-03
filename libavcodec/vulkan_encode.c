@@ -633,8 +633,8 @@ static int vulkan_encode_issue(AVCodecContext *avctx,
     };
     encode_ctrl = (VkVideoCodingControlInfoKHR) {
         .sType = VK_STRUCTURE_TYPE_VIDEO_CODING_CONTROL_INFO_KHR,
-        .pNext = &rc_info,
-        .flags = VK_VIDEO_CODING_CONTROL_ENCODE_RATE_CONTROL_BIT_KHR,
+        /*.pNext = &rc_info,*/
+        .flags = 0 //VK_VIDEO_CODING_CONTROL_ENCODE_RATE_CONTROL_BIT_KHR,
     };
 
     /* Current picture */
@@ -854,7 +854,6 @@ static int vulkan_encode_output(AVCodecContext *avctx,
                                 AVPacket *pkt,
                                 FFVulkanEncodePicture *pic)
 {
-    int err;
     VkResult ret;
     int64_t qstatus = 0;
     uint32_t pkt_size, *query_data;
@@ -885,7 +884,7 @@ static int vulkan_encode_output(AVCodecContext *avctx,
                query_data[1] /* Data written */;
 
     av_log(ctx, AV_LOG_VERBOSE, "Received a packet, %u bytes large (%u off, %u data), "
-           "status = %i\n", pkt_size, query_data[0], query_data[1], err);
+           "status = %i\n", pkt_size, query_data[0], query_data[1], ret);
 
     if (!(sd_buf->buf.flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) {
         VkMappedMemoryRange invalidate_buf = {

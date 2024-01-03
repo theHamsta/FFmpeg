@@ -49,7 +49,7 @@ typedef struct VulkanEncodeH265Context {
     int surface_width;
     int surface_height;
 
-    int min_cb, max_cb; //coding block is not CTB
+    int min_cb, max_cb; // coding block is not CTB
     int min_ctb;
     int min_tbs, max_tbs;
 
@@ -79,10 +79,10 @@ typedef struct VulkanEncodeH265Context {
     StdVideoH265ProfileTierLevel vkvps_tier;
     StdVideoH265VideoParameterSet vkvps;
     /* Structs needed for CBC */
-    H265RawAUD                  raw_aud;
+    H265RawAUD raw_aud;
 
-    CodedBitstreamContext      *cbc;
-    CodedBitstreamFragment      current_access_unit;
+    CodedBitstreamContext *cbc;
+    CodedBitstreamFragment current_access_unit;
     int aud_needed;
     int sei_needed;
 } VulkanEncodeH265Context;
@@ -111,28 +111,31 @@ typedef struct VulkanEncodeH265Picture {
 
 } VulkanEncodeH265Picture;
 
-static av_cold int vulkan_encode_h265_init_sequence_params(AVCodecContext *avctx)
-{
-    VulkanEncodeH265Context             *enc = avctx->priv_data;
+static av_cold int
+vulkan_encode_h265_init_sequence_params(AVCodecContext *avctx) {
+    VulkanEncodeH265Context *enc = avctx->priv_data;
 
-    H265RawSPS                          *sps = &enc->raw_sps;
-    StdVideoH265ScalingLists            *vksps_scaling = &enc->vksps_scaling;
-    StdVideoH265HrdParameters           *vksps_vui_header = &enc->vksps_vui_header;
+    H265RawSPS *sps = &enc->raw_sps;
+    StdVideoH265ScalingLists *vksps_scaling = &enc->vksps_scaling;
+    StdVideoH265HrdParameters *vksps_vui_header = &enc->vksps_vui_header;
     StdVideoH265SequenceParameterSetVui *vksps_vui = &enc->vksps_vui;
-    StdVideoH265SequenceParameterSet    *vksps = &enc->vksps;
-    H265RawVUI                          *vui = &sps->vui;
+    StdVideoH265SequenceParameterSet *vksps = &enc->vksps;
+    H265RawVUI *vui = &sps->vui;
 
-    H265RawPPS                          *pps = &enc->raw_pps;
-    StdVideoH265ScalingLists            *vkpps_scaling = &enc->vkpps_scaling;
-    StdVideoH265PictureParameterSet     *vkpps = &enc->vkpps;
+    H265RawPPS *pps = &enc->raw_pps;
+    StdVideoH265ScalingLists *vkpps_scaling = &enc->vkpps_scaling;
+    StdVideoH265PictureParameterSet *vkpps = &enc->vkpps;
 
-    H265RawVPS                        *vps = &enc->raw_vps;
-    H265RawProfileTierLevel           *ptl = &vps->profile_tier_level;
-    StdVideoH265ProfileTierLevel      *vkvps_tier = &enc->vkvps_tier;
-    StdVideoH265VideoParameterSet     *vkvps = &enc->vkvps;
+    H265RawVPS *vps = &enc->raw_vps;
+    H265RawProfileTierLevel *ptl = &vps->profile_tier_level;
+    StdVideoH265ProfileTierLevel *vkvps_tier = &enc->vkvps_tier;
+    StdVideoH265VideoParameterSet *vkvps = &enc->vkvps;
     const AVPixFmtDescriptor *desc;
     int chroma_format, bit_depth;
     int i;
+    StdVideoH265DecPicBufMgr dec_pic_buf_manager = {
+        .max_latency_increase_plus1 = {1}, .max_num_reorder_pics = {}};
+    StdVideoH265ShortTermRefPicSet short_term_ref_pic_sets = {};
 
     desc = av_pix_fmt_desc_get(avctx->sw_pix_fmt);
     av_assert0(desc);
@@ -265,21 +268,21 @@ static av_cold int vulkan_encode_h265_init_sequence_params(AVCodecContext *avctx
 
     sps->pic_width_in_luma_samples  = enc->surface_width;
     sps->pic_height_in_luma_samples = enc->surface_height;
-#if 0
-    if (avctx->width  != enc->surface_width ||
+#if 1
+    if (avctx->width != enc->surface_width ||
         avctx->height != enc->surface_height) {
         sps->conformance_window_flag = 1;
-        sps->conf_win_left_offset   = 0;
-        sps->conf_win_right_offset  =
+        sps->conf_win_left_offset = 0;
+        sps->conf_win_right_offset =
             (enc->surface_width - avctx->width) >> desc->log2_chroma_w;
-        sps->conf_win_top_offset    = 0;
+        sps->conf_win_top_offset = 0;
         sps->conf_win_bottom_offset =
             (enc->surface_height - avctx->height) >> desc->log2_chroma_h;
     } else {
         sps->conformance_window_flag = 0;
     }
 #endif
-    sps->bit_depth_luma_minus8   = bit_depth - 8;
+    sps->bit_depth_luma_minus8 = bit_depth - 8;
     sps->bit_depth_chroma_minus8 = bit_depth - 8;
 
     sps->log2_max_pic_order_cnt_lsb_minus4 = 4;
@@ -293,6 +296,12 @@ static av_cold int vulkan_encode_h265_init_sequence_params(AVCodecContext *avctx
             vps->vps_max_num_reorder_pics[i];
         sps->sps_max_latency_increase_plus1[i] =
             vps->vps_max_latency_increase_plus1[i];
+        dec_pic_buf_manager.max_dec_pic_buffering_minus1[i] =
+            sps->sps_max_dec_pic_buffering_minus1[i];
+        dec_pic_buf_manager.max_num_reorder_pics[i] =
+            sps->sps_max_num_reorder_pics[i];
+        dec_pic_buf_manager.max_latency_increase_plus1[i] =
+            sps->sps_max_latency_increase_plus1[i];
     }
 
     // These values come from the capabilities of the first encoder
@@ -300,23 +309,38 @@ static av_cold int vulkan_encode_h265_init_sequence_params(AVCodecContext *avctx
     // fail badly with other platforms or drivers.
     // CTB size from 16x16 to 64x64.
     // CB size minimum can be 8x8.
-    sps->log2_min_luma_coding_block_size_minus3   = av_log2(enc->min_cb) - 3;
+    sps->log2_min_luma_coding_block_size_minus3 = av_log2(enc->min_cb) - 3;
     sps->log2_diff_max_min_luma_coding_block_size = av_log2(enc->max_cb) - av_log2(enc->min_cb);
     // Transform size from 4x4 to 32x32.
-    sps->log2_min_luma_transform_block_size_minus2   = av_log2(enc->min_tbs) - 2;
+    sps->log2_min_luma_transform_block_size_minus2 = av_log2(enc->min_tbs) - 2;
     sps->log2_diff_max_min_luma_transform_block_size = av_log2(enc->max_tbs) - av_log2(enc->min_tbs);
     // Full transform hierarchy allowed (2-5).
-    sps->max_transform_hierarchy_depth_inter = 4;
-    sps->max_transform_hierarchy_depth_intra = 4;
+    sps->max_transform_hierarchy_depth_inter = 3;
+    sps->max_transform_hierarchy_depth_intra = 3;
     // AMP works.
     sps->amp_enabled_flag = 1;
-    sps->sample_adaptive_offset_enabled_flag = 0;
-    if (enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_SAMPLE_ADAPTIVE_OFFSET_ENABLED_FLAG_SET_BIT_KHR)
+    sps->sample_adaptive_offset_enabled_flag = 1;
+    if (enc->caps.stdSyntaxFlags &
+        VK_VIDEO_ENCODE_H265_STD_SAMPLE_ADAPTIVE_OFFSET_ENABLED_FLAG_SET_BIT_KHR)
         sps->sample_adaptive_offset_enabled_flag = 1;
     sps->sps_temporal_mvp_enabled_flag       = 0;
     sps->pcm_enabled_flag = 0;
     sps->num_short_term_ref_pic_sets     = 0;
     sps->vui_parameters_present_flag = 0;
+
+    // ensure known to be working config
+    if (sps->log2_min_luma_coding_block_size_minus3 == 1) {
+        av_log(avctx, AV_LOG_ERROR, "sps->log2_min_luma_coding_block_size_minus3 does not have expected value\n");
+        exit(1);
+    }
+    if (sps->log2_diff_max_min_luma_coding_block_size == 1) {
+        av_log(avctx, AV_LOG_ERROR, "sps->log2_min_luma_coding_block_size_minus3 does not have expected value\n");
+        exit(1);
+    }
+    if (sps->log2_diff_max_min_luma_transform_block_size == 0) {
+        av_log(avctx, AV_LOG_ERROR, "sps->log2_diff_max_min_luma_transform_block_size does not have expected value\n");
+        exit(1);
+    }
 
     if (avctx->sample_aspect_ratio.num != 0 &&
         avctx->sample_aspect_ratio.den != 0) {
@@ -340,11 +364,11 @@ static av_cold int vulkan_encode_h265_init_sequence_params(AVCodecContext *avctx
     vui->aspect_ratio_idc = 0;
 
     /* Unspecified video format, from table E-2. */
-    vui->video_format             = 5;
-    vui->video_full_range_flag    = avctx->color_range == AVCOL_RANGE_JPEG;
-    vui->colour_primaries         = avctx->color_primaries;
-    vui->transfer_characteristics = avctx->color_trc;
-    vui->matrix_coefficients      = avctx->colorspace;
+    vui->video_format = 5;
+    vui->video_full_range_flag = avctx->color_range == AVCOL_RANGE_JPEG;
+    vui->colour_primaries = 2;
+    vui->transfer_characteristics = 2;
+    vui->matrix_coefficients = 2;
     if (avctx->color_primaries != AVCOL_PRI_UNSPECIFIED ||
         avctx->color_trc       != AVCOL_TRC_UNSPECIFIED ||
         avctx->colorspace      != AVCOL_SPC_UNSPECIFIED)
@@ -361,25 +385,27 @@ static av_cold int vulkan_encode_h265_init_sequence_params(AVCodecContext *avctx
     }
 
     vui->vui_timing_info_present_flag = 1;
-    vui->vui_num_units_in_tick               = vps->vps_num_units_in_tick;
-    vui->vui_time_scale                      = vps->vps_time_scale;
-    vui->vui_poc_proportional_to_timing_flag = vps->vps_poc_proportional_to_timing_flag;
-    vui->vui_num_ticks_poc_diff_one_minus1   = vps->vps_num_ticks_poc_diff_one_minus1;
-    vui->vui_hrd_parameters_present_flag     = 0;
+    vui->vui_num_units_in_tick = vps->vps_num_units_in_tick;
+    vui->vui_time_scale = vps->vps_time_scale;
+    vui->vui_poc_proportional_to_timing_flag =
+        vps->vps_poc_proportional_to_timing_flag;
+    vui->vui_num_ticks_poc_diff_one_minus1 =
+        vps->vps_num_ticks_poc_diff_one_minus1;
+    vui->vui_hrd_parameters_present_flag = 0;
 
-    vui->bitstream_restriction_flag    = 1;
+    vui->bitstream_restriction_flag = 1;
     vui->motion_vectors_over_pic_boundaries_flag = 1;
     vui->restricted_ref_pic_lists_flag = 1;
     vui->max_bytes_per_pic_denom       = 2;
     vui->max_bits_per_min_cu_denom     = 1;
     vui->log2_max_mv_length_horizontal = 15;
-    vui->log2_max_mv_length_vertical   = 15;
+    vui->log2_max_mv_length_vertical = 15;
 
     // PPS
 
-    pps->nal_unit_header = (H265RawNALUnitHeader) {
-        .nal_unit_type         = HEVC_NAL_PPS,
-        .nuh_layer_id          = 0,
+    pps->nal_unit_header = (H265RawNALUnitHeader){
+        .nal_unit_type = HEVC_NAL_PPS,
+        .nuh_layer_id = 0,
         .nuh_temporal_id_plus1 = 1,
     };
 
@@ -395,14 +421,17 @@ static av_cold int vulkan_encode_h265_init_sequence_params(AVCodecContext *avctx
     pps->cu_qp_delta_enabled_flag = 0;//(ctx->va_rc_mode != VA_RC_CQP);
     pps->diff_cu_qp_delta_depth   = 0;
 
-    if (enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_TRANSFORM_SKIP_ENABLED_FLAG_SET_BIT_KHR)
+    if (enc->caps.stdSyntaxFlags &
+        VK_VIDEO_ENCODE_H265_STD_TRANSFORM_SKIP_ENABLED_FLAG_SET_BIT_KHR)
         pps->transform_skip_enabled_flag = 1;
 
     pps->pps_loop_filter_across_slices_enabled_flag = 0;
     pps->deblocking_filter_control_present_flag = 1;
-    if (enc->caps.stdSyntaxFlags & VK_VIDEO_ENCODE_H265_STD_CONSTRAINED_INTRA_PRED_FLAG_SET_BIT_KHR)
+    if (enc->caps.stdSyntaxFlags &
+        VK_VIDEO_ENCODE_H265_STD_CONSTRAINED_INTRA_PRED_FLAG_SET_BIT_KHR)
         pps->constrained_intra_pred_flag = 1;
-    //    pps->diff_cu_qp_delta_depth = sps->log2_diff_max_min_luma_coding_block_size;
+    //    pps->diff_cu_qp_delta_depth =
+    //    sps->log2_diff_max_min_luma_coding_block_size;
 
     *vksps_scaling = (StdVideoH265ScalingLists) {
     };
@@ -410,63 +439,6 @@ static av_cold int vulkan_encode_h265_init_sequence_params(AVCodecContext *avctx
     *vksps_vui_header = (StdVideoH265HrdParameters) {
     };
 
-    *vksps_vui = (StdVideoH265SequenceParameterSetVui) {
-        .aspect_ratio_idc = vui->aspect_ratio_idc,
-        .sar_width = vui->sar_width,
-        .sar_height = vui->sar_height,
-        .video_format = vui->video_format,
-        .colour_primaries = vui->colour_primaries,
-        .transfer_characteristics = vui->transfer_characteristics,
-        .vui_num_units_in_tick = vui->vui_num_units_in_tick,
-        .vui_time_scale = vui->vui_time_scale,
-        .pHrdParameters = vksps_vui_header,
-        .flags = (StdVideoH265SpsVuiFlags) {
-            .aspect_ratio_info_present_flag = vui->aspect_ratio_info_present_flag,
-            .overscan_info_present_flag = vui->overscan_info_present_flag,
-            .overscan_appropriate_flag = vui->overscan_appropriate_flag,
-            .video_signal_type_present_flag = vui->video_signal_type_present_flag,
-            .video_full_range_flag = vui->video_full_range_flag,
-            .chroma_loc_info_present_flag = vui->chroma_loc_info_present_flag,
-            .vui_timing_info_present_flag = vui->vui_timing_info_present_flag,
-            .bitstream_restriction_flag = vui->bitstream_restriction_flag,
-            .vui_hrd_parameters_present_flag = sps->vui_parameters_present_flag,
-        },
-    };
-
-    *vksps = (StdVideoH265SequenceParameterSet) {
-        .sps_video_parameter_set_id = sps->sps_video_parameter_set_id,
-        .chroma_format_idc = sps->chroma_format_idc,
-        .bit_depth_luma_minus8 = sps->bit_depth_luma_minus8,
-        .bit_depth_chroma_minus8 = sps->bit_depth_chroma_minus8,
-        .pic_width_in_luma_samples  = sps->pic_width_in_luma_samples,
-        .pic_height_in_luma_samples = sps->pic_height_in_luma_samples,
-        .log2_max_pic_order_cnt_lsb_minus4 = sps->log2_max_pic_order_cnt_lsb_minus4,
-        .log2_min_luma_coding_block_size_minus3 = sps->log2_min_luma_coding_block_size_minus3,
-        .flags = (StdVideoH265SpsFlags) {
-            .strong_intra_smoothing_enabled_flag = sps->strong_intra_smoothing_enabled_flag,
-            .amp_enabled_flag = sps->amp_enabled_flag,
-            .sample_adaptive_offset_enabled_flag = sps->sample_adaptive_offset_enabled_flag,
-        },
-        .pSequenceParameterSetVui = vksps_vui,
-    };
-
-    *vkpps_scaling = (StdVideoH265ScalingLists) {
-    };
-
-    *vkpps = (StdVideoH265PictureParameterSet) {
-        .pps_seq_parameter_set_id = pps->pps_seq_parameter_set_id,
-        .pps_pic_parameter_set_id = pps->pps_pic_parameter_set_id,
-        .num_ref_idx_l0_default_active_minus1 = pps->num_ref_idx_l0_default_active_minus1,
-        .num_ref_idx_l1_default_active_minus1 = pps->num_ref_idx_l1_default_active_minus1,
-        .init_qp_minus26 = pps->init_qp_minus26,
-        .flags = (StdVideoH265PpsFlags) {
-            .constrained_intra_pred_flag = pps->constrained_intra_pred_flag,
-            .cabac_init_present_flag = pps->cabac_init_present_flag,
-            .transform_skip_enabled_flag = pps->transform_skip_enabled_flag,
-            .cu_qp_delta_enabled_flag = pps->cu_qp_delta_enabled_flag,
-            .deblocking_filter_control_present_flag = pps->deblocking_filter_control_present_flag,
-        },
-    };
 
     *vkvps_tier = (StdVideoH265ProfileTierLevel) {
         .general_profile_idc = ptl->general_profile_idc,
@@ -479,20 +451,90 @@ static av_cold int vulkan_encode_h265_init_sequence_params(AVCodecContext *avctx
             .general_frame_only_constraint_flag = ptl->general_frame_only_constraint_flag,
         },
     };
-    *vkvps = (StdVideoH265VideoParameterSet) {
+
+    *vksps_vui = (StdVideoH265SequenceParameterSetVui) {
+        .aspect_ratio_idc = vui->aspect_ratio_idc,
+        .sar_width = vui->sar_width,
+        .sar_height = vui->sar_height,
+        .video_format = vui->video_format,
+        .colour_primaries = vui->colour_primaries,
+        .transfer_characteristics = vui->transfer_characteristics,
+        .vui_num_units_in_tick = vui->vui_num_units_in_tick,
+        .vui_time_scale = vui->vui_time_scale,
+        .pHrdParameters = vksps_vui_header,
+        .flags =
+        (StdVideoH265SpsVuiFlags){
+            .aspect_ratio_info_present_flag =
+            vui->aspect_ratio_info_present_flag,
+            .overscan_info_present_flag = vui->overscan_info_present_flag,
+            .overscan_appropriate_flag = vui->overscan_appropriate_flag,
+            .video_signal_type_present_flag =
+            vui->video_signal_type_present_flag,
+            .video_full_range_flag = vui->video_full_range_flag,
+            .chroma_loc_info_present_flag = vui->chroma_loc_info_present_flag,
+            .vui_timing_info_present_flag = vui->vui_timing_info_present_flag,
+            .bitstream_restriction_flag = vui->bitstream_restriction_flag,
+            .vui_hrd_parameters_present_flag =
+            sps->vui_parameters_present_flag,
+        },
+    };
+
+    *vksps = (StdVideoH265SequenceParameterSet){
+        .sps_video_parameter_set_id = sps->sps_video_parameter_set_id,
+        .chroma_format_idc = sps->chroma_format_idc,
+        .bit_depth_luma_minus8 = sps->bit_depth_luma_minus8,
+        .bit_depth_chroma_minus8 = sps->bit_depth_chroma_minus8,
+        .pic_width_in_luma_samples = sps->pic_width_in_luma_samples,
+        .pic_height_in_luma_samples = sps->pic_height_in_luma_samples,
+        .log2_max_pic_order_cnt_lsb_minus4 = sps->log2_max_pic_order_cnt_lsb_minus4,
+        .log2_min_luma_coding_block_size_minus3 = sps->log2_min_luma_coding_block_size_minus3,
+        .log2_diff_max_min_luma_coding_block_size = sps->log2_diff_max_min_luma_coding_block_size,
+        .log2_diff_max_min_luma_transform_block_size = sps->log2_diff_max_min_luma_transform_block_size,
+        .flags = (StdVideoH265SpsFlags){
+            .strong_intra_smoothing_enabled_flag = sps->strong_intra_smoothing_enabled_flag,
+            .amp_enabled_flag = sps->amp_enabled_flag,
+            .sample_adaptive_offset_enabled_flag = sps->sample_adaptive_offset_enabled_flag,
+        },
+        .pDecPicBufMgr = &dec_pic_buf_manager,
+        .pProfileTierLevel = vkvps_tier,
+        /*.num_short_term_ref_pic_sets = 0*/
+        /*.pShortTermRefPicSet = NULL,*/
+        /*.pLongTermRefPicsSps = NULL,*/
+        .pSequenceParameterSetVui = vksps_vui,
+    };
+
+    *vkpps = (StdVideoH265PictureParameterSet){
+        .pps_seq_parameter_set_id = pps->pps_seq_parameter_set_id,
+        .pps_pic_parameter_set_id = pps->pps_pic_parameter_set_id,
+        .num_ref_idx_l0_default_active_minus1 = pps->num_ref_idx_l0_default_active_minus1,
+        .num_ref_idx_l1_default_active_minus1 = pps->num_ref_idx_l1_default_active_minus1,
+        .init_qp_minus26 = pps->init_qp_minus26,
+        .flags =
+        (StdVideoH265PpsFlags){
+            .constrained_intra_pred_flag = pps->constrained_intra_pred_flag,
+            .cabac_init_present_flag = pps->cabac_init_present_flag,
+            .transform_skip_enabled_flag = pps->transform_skip_enabled_flag,
+            .cu_qp_delta_enabled_flag = pps->cu_qp_delta_enabled_flag,
+            .deblocking_filter_control_present_flag = pps->deblocking_filter_control_present_flag,
+        },
+    };
+
+    *vkvps = (StdVideoH265VideoParameterSet){
         .vps_video_parameter_set_id = vps->vps_video_parameter_set_id,
         .vps_max_sub_layers_minus1 = vps->vps_max_sub_layers_minus1,
         .vps_num_units_in_tick = vps->vps_num_units_in_tick,
         .vps_time_scale = vps->vps_time_scale,
-        .vps_num_ticks_poc_diff_one_minus1 = vps->vps_num_ticks_poc_diff_one_minus1,
-        .flags = (StdVideoH265VpsFlags) {
+        .vps_num_ticks_poc_diff_one_minus1 =
+        vps->vps_num_ticks_poc_diff_one_minus1,
+        .flags =
+        (StdVideoH265VpsFlags){
             .vps_temporal_id_nesting_flag = vps->vps_temporal_id_nesting_flag,
             .vps_sub_layer_ordering_info_present_flag = vps->vps_sub_layer_ordering_info_present_flag,
             .vps_timing_info_present_flag = vps->vps_timing_info_present_flag,
             .vps_poc_proportional_to_timing_flag = vps->vps_poc_proportional_to_timing_flag,
         },
         .pProfileTierLevel = vkvps_tier,
-    };
+        .pDecPicBufMgr = &dec_pic_buf_manager};
 
     return 0;
 }
@@ -542,7 +584,7 @@ static int vulkan_encode_h265_write_sequence_header(AVCodecContext *avctx,
 {
     int err;
     VulkanEncodeH265Context *enc = avctx->priv_data;
-    CodedBitstreamFragment   *au = &enc->current_access_unit;
+    CodedBitstreamFragment *au = &enc->current_access_unit;
 
     if (enc->write_units & UNIT_AUD) {
         err = vulkan_encode_h265_add_nal(avctx, au, &enc->raw_aud);
@@ -579,7 +621,7 @@ static av_cold int vulkan_encode_h265_create_session(AVCodecContext *avctx)
     VkVideoSessionParametersCreateInfoKHR session_params_create;
 
     h265_params_info = (VkVideoEncodeH265SessionParametersAddInfoKHR) {
-        .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H265_SESSION_PARAMETERS_ADD_INFO_KHR,
+        VK_STRUCTURE_TYPE_VIDEO_ENCODE_H265_SESSION_PARAMETERS_ADD_INFO_KHR,
         .pStdSPSs = &enc->vksps,
         .stdSPSCount = 1,
         .pStdPPSs = &enc->vkpps,
@@ -602,10 +644,12 @@ static av_cold int vulkan_encode_h265_create_session(AVCodecContext *avctx)
     };
 
     /* Create session parameters */
-    ret = vk->CreateVideoSessionParametersKHR(enc->vkenc.s.hwctx->act_dev, &session_params_create,
-                                              enc->vkenc.s.hwctx->alloc, &enc->vkenc.session_params);
+    ret = vk->CreateVideoSessionParametersKHR(
+        enc->vkenc.s.hwctx->act_dev, &session_params_create,
+        enc->vkenc.s.hwctx->alloc, &enc->vkenc.session_params);
     if (ret != VK_SUCCESS) {
-        av_log(avctx, AV_LOG_ERROR, "Unable to create Vulkan video session parameters: %s!\n",
+        av_log(avctx, AV_LOG_ERROR,
+               "Unable to create Vulkan video session parameters: %s!\n",
                ff_vk_ret2str(ret));
         return AVERROR_EXTERNAL;
     }
@@ -637,18 +681,18 @@ static int vulkan_encode_h265_init_pic_headers(AVCodecContext *avctx,
         hpic->last_idr_frame = hprev->last_idr_frame;
 
         if (pic->type == FF_VK_FRAME_I) {
-            hpic->slice_type     = STD_VIDEO_H265_SLICE_TYPE_I;
-            hpic->pic_type       = STD_VIDEO_H265_PICTURE_TYPE_I;
-            nal_aud_pic_type  = 0;
+            hpic->slice_type = STD_VIDEO_H265_SLICE_TYPE_I;
+            hpic->pic_type = STD_VIDEO_H265_PICTURE_TYPE_I;
+            nal_aud_pic_type = 0;
         } else if (pic->type == FF_VK_FRAME_P) {
             av_assert0(pic->refs[0]);
-            hpic->slice_type     = STD_VIDEO_H265_SLICE_TYPE_P;
-            hpic->pic_type       = STD_VIDEO_H264_PICTURE_TYPE_P;
-            nal_aud_pic_type  = 1;
+            hpic->slice_type = STD_VIDEO_H265_SLICE_TYPE_P;
+            hpic->pic_type = STD_VIDEO_H265_PICTURE_TYPE_P;
+            nal_aud_pic_type = 1;
         } else {
-            hpic->slice_type = STD_VIDEO_H264_SLICE_TYPE_B;
-            hpic->pic_type   = STD_VIDEO_H264_PICTURE_TYPE_B;
-            nal_aud_pic_type  = 2;
+            hpic->slice_type = STD_VIDEO_H265_SLICE_TYPE_B;
+            hpic->pic_type = STD_VIDEO_H265_PICTURE_TYPE_B;
+            nal_aud_pic_type = 2;
         }
     }
 
@@ -657,8 +701,9 @@ static int vulkan_encode_h265_init_pic_headers(AVCodecContext *avctx,
     enc->write_units = 0x0;
 
     if (enc->insert_units & UNIT_AUD) {
-        enc->raw_aud = (H265RawAUD) {
-            .nal_unit_header = {
+        enc->raw_aud = (H265RawAUD){
+            .nal_unit_header =
+            {
                 .nal_unit_type = HEVC_NAL_AUD,
                 .nuh_temporal_id_plus1 = 1,
             },
@@ -667,8 +712,9 @@ static int vulkan_encode_h265_init_pic_headers(AVCodecContext *avctx,
         enc->write_units |= UNIT_AUD;
     }
 
-    hpic->slice_wt = (StdVideoEncodeH265WeightTable) {
-        .flags = (StdVideoEncodeH265WeightTableFlags) {
+    hpic->slice_wt = (StdVideoEncodeH265WeightTable){
+        .flags =
+        (StdVideoEncodeH265WeightTableFlags){
             .luma_weight_l0_flag = 0,
             .chroma_weight_l0_flag = 0,
             .luma_weight_l1_flag = 0,
@@ -676,24 +722,25 @@ static int vulkan_encode_h265_init_pic_headers(AVCodecContext *avctx,
         },
         .luma_log2_weight_denom = 0,
         .delta_chroma_log2_weight_denom = 0,
-        .delta_luma_weight_l0 = { 0 },
-        .luma_offset_l0 = { 0 },
-        .delta_chroma_weight_l0 = { { 0 } },
-        .delta_chroma_offset_l0 = { { 0 } },
-        .delta_luma_weight_l1 = { 0 },
-        .luma_offset_l1 = { 0 },
-        .delta_chroma_weight_l1 = { { 0 } },
-        .delta_chroma_offset_l1 = { { 0 } },
+        .delta_luma_weight_l0 = {0},
+        .luma_offset_l0 = {0},
+        .delta_chroma_weight_l0 = {{0}},
+        .delta_chroma_offset_l0 = {{0}},
+        .delta_luma_weight_l1 = {0},
+        .luma_offset_l1 = {0},
+        .delta_chroma_weight_l1 = {{0}},
+        .delta_chroma_offset_l1 = {{0}},
     };
 
-    hpic->slice_segment_hdr = (StdVideoEncodeH265SliceSegmentHeader) {
-        .flags = (StdVideoEncodeH265SliceSegmentHeaderFlags) {
+    hpic->slice_segment_hdr = (StdVideoEncodeH265SliceSegmentHeader){
+        .flags =
+        (StdVideoEncodeH265SliceSegmentHeaderFlags){
             .first_slice_segment_in_pic_flag = 1,
             .dependent_slice_segment_flag = 0,
             .slice_sao_luma_flag = 0,
             .slice_sao_chroma_flag = 0,
             .num_ref_idx_active_override_flag = 0,
-            .slice_loop_filter_across_slices_enabled_flag = 0,//pps->pps_loop_filter_across_slices_enabled_flag,
+            .slice_loop_filter_across_slices_enabled_flag = 0, // pps->pps_loop_filter_across_slices_enabled_flag,
             .mvd_l1_zero_flag = 0,
             .cabac_init_flag = 0,
             .cu_chroma_qp_offset_enabled_flag = 0,
@@ -715,14 +762,15 @@ static int vulkan_encode_h265_init_pic_headers(AVCodecContext *avctx,
         .pWeightTable = &hpic->slice_wt,
     };
 
-    hpic->vkslice = (VkVideoEncodeH265NaluSliceSegmentInfoKHR) {
+    hpic->vkslice = (VkVideoEncodeH265NaluSliceSegmentInfoKHR){
         .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H265_NALU_SLICE_SEGMENT_INFO_KHR,
         .pNext = NULL,
         .pStdSliceSegmentHeader = &hpic->slice_segment_hdr,
     };
 
-    hpic->h265pic_info = (StdVideoEncodeH265PictureInfo) {
-        .flags = (StdVideoEncodeH265PictureInfoFlags) {
+    hpic->h265pic_info = (StdVideoEncodeH265PictureInfo){
+        .flags =
+        (StdVideoEncodeH265PictureInfoFlags){
             .is_reference = pic->is_reference,
             //            .IrapPicFlag = pic->type == FF_VK_FRAME_KEY,
             .used_for_long_term_reference = 0,
@@ -730,7 +778,7 @@ static int vulkan_encode_h265_init_pic_headers(AVCodecContext *avctx,
             .cross_layer_bla_flag = 0,
             .pic_output_flag = 0,
             .no_output_of_prior_pics_flag = 0,
-            .short_term_ref_pic_set_sps_flag = 1,
+            .short_term_ref_pic_set_sps_flag = 0,
             .slice_temporal_mvp_enabled_flag = 0,
             /* Reserved */
         },
@@ -743,8 +791,9 @@ static int vulkan_encode_h265_init_pic_headers(AVCodecContext *avctx,
         .pRefLists = &hpic->ref_list_info,
     };
 
-    hpic->ref_list_info = (StdVideoEncodeH265ReferenceListsInfo) {
-        .flags                    = (StdVideoEncodeH265ReferenceListsInfoFlags) {
+    hpic->ref_list_info = (StdVideoEncodeH265ReferenceListsInfo){
+        .flags =
+        (StdVideoEncodeH265ReferenceListsInfoFlags){
             .ref_pic_list_modification_flag_l0 = 0,
             .ref_pic_list_modification_flag_l1 = 0,
         },
@@ -754,8 +803,9 @@ static int vulkan_encode_h265_init_pic_headers(AVCodecContext *avctx,
         FFVulkanEncodePicture *ref = pic->refs[i];
         VulkanEncodeH265Picture *href = ref->priv_data;
 
-        hpic->l0ref_info[0] = (StdVideoEncodeH265ReferenceInfo) {
-            .flags = (StdVideoEncodeH265ReferenceInfoFlags) {
+        hpic->l0ref_info[0] = (StdVideoEncodeH265ReferenceInfo){
+            .flags =
+            (StdVideoEncodeH265ReferenceInfoFlags){
                 .used_for_long_term_reference = 0,
                 .unused_for_reference = 0,
             },
@@ -764,13 +814,13 @@ static int vulkan_encode_h265_init_pic_headers(AVCodecContext *avctx,
             .TemporalId = 0,
         };
 
-        hpic->l0refs[i] = (VkVideoEncodeH265DpbSlotInfoKHR) {
+        hpic->l0refs[i] = (VkVideoEncodeH265DpbSlotInfoKHR){
             .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H265_DPB_SLOT_INFO_KHR,
             .pStdReferenceInfo = &hpic->l0ref_info[i],
         };
     }
 
-    hpic->vkh265pic_info = (VkVideoEncodeH265PictureInfoKHR) {
+    hpic->vkh265pic_info = (VkVideoEncodeH265PictureInfoKHR){
         .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H265_PICTURE_INFO_KHR,
         .pNext = NULL,
         .naluSliceSegmentEntryCount = 1,
@@ -778,33 +828,33 @@ static int vulkan_encode_h265_init_pic_headers(AVCodecContext *avctx,
         .pStdPictureInfo = &hpic->h265pic_info,
     };
 
-    hpic->vkrc_info = (VkVideoEncodeH265RateControlInfoKHR) {
+    hpic->vkrc_info = (VkVideoEncodeH265RateControlInfoKHR){
         .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H265_RATE_CONTROL_INFO_KHR,
     };
 
-    hpic->vkrc_layer_info = (VkVideoEncodeH265RateControlLayerInfoKHR) {
+    hpic->vkrc_layer_info = (VkVideoEncodeH265RateControlLayerInfoKHR){
         .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H265_RATE_CONTROL_LAYER_INFO_KHR,
         .pNext = NULL,
-        .minQp = (VkVideoEncodeH265QpKHR){ qp, qp, qp },
-        .maxQp = (VkVideoEncodeH265QpKHR){ qp, qp, qp },
+        .minQp = (VkVideoEncodeH265QpKHR){qp, qp, qp},
+        .maxQp = (VkVideoEncodeH265QpKHR){qp, qp, qp},
         .useMinQp = 1,
         .useMaxQp = 1,
     };
 
-    pic->codec_info     = &hpic->vkh265pic_info;
-    pic->codec_layer    = &hpic->vkrc_info;
-    pic->codec_rc_layer = &hpic->vkrc_layer_info;
+    pic->codec_info = &hpic->vkh265pic_info;
+    /*pic->codec_layer = &hpic->vkrc_info;*/
+    /*pic->codec_rc_layer = &hpic->vkrc_layer_info;*/
 
     return 0;
 }
 
 static int vulkan_encode_h265_write_extra_headers(AVCodecContext *avctx,
                                                   FFVulkanEncodePicture *pic,
-                                                  uint8_t *data, size_t *data_len)
-{
-    int err;
+                                                  uint8_t *data,
+                                                  size_t *data_len) {
+    int err = 0;
     VulkanEncodeH265Context *enc = avctx->priv_data;
-    CodedBitstreamFragment   *au = &enc->current_access_unit;
+    CodedBitstreamFragment *au = &enc->current_access_unit;
 
     if (enc->write_units) {
         if (enc->write_units & UNIT_AUD) {
@@ -827,15 +877,16 @@ fail:
     return err;
 }
 
-static int vulkan_encode_h265_write_filler(AVCodecContext *avctx, uint32_t filler,
-                                           uint8_t *data, size_t *data_len)
-{
+static int vulkan_encode_h265_write_filler(AVCodecContext *avctx,
+                                           uint32_t filler, uint8_t *data,
+                                           size_t *data_len) {
     int err = 0;
     VulkanEncodeH265Context *enc = avctx->priv_data;
-    CodedBitstreamFragment   *au = &enc->current_access_unit;
+    CodedBitstreamFragment *au = &enc->current_access_unit;
 
     H265RawFiller raw_filler = {
-        .nal_unit_header = {
+        .nal_unit_header =
+        {
             .nal_unit_type = HEVC_NAL_FD_NUT,
             .nuh_temporal_id_plus1 = 1,
         },
@@ -860,8 +911,7 @@ static const FFVulkanEncoder encoder = {
     .write_extra_headers = vulkan_encode_h265_write_extra_headers,
 };
 
-static av_cold int vulkan_encode_h265_init(AVCodecContext *avctx)
-{
+static av_cold int vulkan_encode_h265_init(AVCodecContext *avctx) {
     int err;
     VulkanEncodeH265Context *enc = avctx->priv_data;
 
@@ -870,12 +920,12 @@ static av_cold int vulkan_encode_h265_init(AVCodecContext *avctx)
     if (avctx->level == FF_LEVEL_UNKNOWN)
         avctx->level = enc->level;
 
-    enc->profile = (VkVideoEncodeH265ProfileInfoKHR) {
+    enc->profile = (VkVideoEncodeH265ProfileInfoKHR){
         .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H265_PROFILE_INFO_KHR,
         .stdProfileIdc = enc->vkenc.opts.profile,
     };
 
-    enc->caps = (VkVideoEncodeH265CapabilitiesKHR) {
+    enc->caps = (VkVideoEncodeH265CapabilitiesKHR){
         .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H265_CAPABILITIES_KHR,
     };
 
@@ -883,14 +933,14 @@ static av_cold int vulkan_encode_h265_init(AVCodecContext *avctx)
     if (err < 0)
         return err;
 
-    enc->bit_rate    = avctx->bit_rate;
-    enc->gop_size    = 3; /* avctx->gop_size; */
-    enc->b_per_p     = 0; /* avctx->max_b_frames; */
+    enc->bit_rate = avctx->bit_rate;
+    enc->gop_size = 1;    /* avctx->gop_size; */
+    enc->b_per_p = 0;     /* avctx->max_b_frames; */
     enc->max_b_depth = 0; /* FFMIN(enc->desired_b_depth,
-                             av_log2(enc->b_per_p) + 1); */
+                           av_log2(enc->b_per_p) + 1); */
 
     enc->vkenc.gop_size = enc->gop_size;
-    enc->vkenc.bitrate =enc->bit_rate;
+    enc->vkenc.bitrate = enc->bit_rate;
 
     err = ff_vulkan_encode_init(avctx, &enc->vkenc, &enc->profile, &enc->caps,
                                 &encoder, enc->b_per_p, enc->max_b_depth);
