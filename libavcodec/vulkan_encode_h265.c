@@ -133,9 +133,8 @@ vulkan_encode_h265_init_sequence_params(AVCodecContext *avctx) {
     const AVPixFmtDescriptor *desc;
     int chroma_format, bit_depth;
     int i;
-    StdVideoH265DecPicBufMgr dec_pic_buf_manager = {
-        .max_latency_increase_plus1 = {1}, .max_num_reorder_pics = {}};
-    StdVideoH265ShortTermRefPicSet short_term_ref_pic_sets = {};
+    StdVideoH265DecPicBufMgr dec_pic_buf_manager = { 0 };
+    StdVideoH265ShortTermRefPicSet short_term_ref_pic_sets[HEVC_MAX_SHORT_TERM_REF_PIC_SETS] = { 0 };
 
     desc = av_pix_fmt_desc_get(avctx->sw_pix_fmt);
     av_assert0(desc);
@@ -304,6 +303,38 @@ vulkan_encode_h265_init_sequence_params(AVCodecContext *avctx) {
             sps->sps_max_latency_increase_plus1[i];
     }
 
+    for ( uint8_t i = 0; i < sps->num_short_term_ref_pic_sets; i++ ) {
+        H265RawSTRefPicSet* rps = &sps->st_ref_pic_set[i];
+        short_term_ref_pic_sets[i] = (StdVideoH265ShortTermRefPicSet) {
+            .flags = (StdVideoH265ShortTermRefPicSetFlags) {
+                .inter_ref_pic_set_prediction_flag = rps->inter_ref_pic_set_prediction_flag,
+                .delta_rps_sign = rps->delta_rps_sign,
+            },
+            .delta_idx_minus1 = rps->delta_idx_minus1,
+            .use_delta_flag = 0,
+            .abs_delta_rps_minus1 = rps->abs_delta_rps_minus1,
+            .used_by_curr_pic_flag = 0,
+            .used_by_curr_pic_s0_flag = 0,
+            .used_by_curr_pic_s1_flag = 0,
+            .num_negative_pics = rps->num_negative_pics,
+            .num_positive_pics = rps->num_positive_pics,
+        };
+        for (int j = 0; j < HEVC_MAX_REFS; j++) {
+            if (rps->use_delta_flag[j]) {
+                short_term_ref_pic_sets[i].use_delta_flag |= 1 << j;
+            }
+            if (rps->used_by_curr_pic_flag[j]) {
+                short_term_ref_pic_sets[i].used_by_curr_pic_flag |= 1 << j;
+            }
+            if (rps->used_by_curr_pic_s0_flag[j]) {
+                short_term_ref_pic_sets[i].used_by_curr_pic_s0_flag |= 1 << j;
+            }
+            if (rps->used_by_curr_pic_s1_flag[j]) {
+                short_term_ref_pic_sets[i].used_by_curr_pic_s1_flag |= 1 << j;
+            }
+        }
+    }
+
     // These values come from the capabilities of the first encoder
     // implementation in the i965 driver on Intel Skylake.  They may
     // fail badly with other platforms or drivers.
@@ -325,7 +356,6 @@ vulkan_encode_h265_init_sequence_params(AVCodecContext *avctx) {
         sps->sample_adaptive_offset_enabled_flag = 1;
     sps->sps_temporal_mvp_enabled_flag       = 0;
     sps->pcm_enabled_flag = 0;
-    sps->num_short_term_ref_pic_sets     = 0;
     sps->vui_parameters_present_flag = 0;
 
     // ensure known to be working config
@@ -497,8 +527,9 @@ vulkan_encode_h265_init_sequence_params(AVCodecContext *avctx) {
         },
         .pDecPicBufMgr = &dec_pic_buf_manager,
         .pProfileTierLevel = vkvps_tier,
-        /*.num_short_term_ref_pic_sets = 0*/
-        /*.pShortTermRefPicSet = NULL,*/
+        .num_short_term_ref_pic_sets = sps->num_short_term_ref_pic_sets,
+        .pShortTermRefPicSet = short_term_ref_pic_sets,
+        /*.num_long_term_ref_pics_sps = sps->num_long_term_ref_pics_sps,*/
         /*.pLongTermRefPicsSps = NULL,*/
         .pSequenceParameterSetVui = vksps_vui,
     };
