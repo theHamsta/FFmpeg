@@ -861,6 +861,11 @@ static int vulkan_encode_h265_init_pic_headers(AVCodecContext *avctx,
 
     hpic->vkrc_info = (VkVideoEncodeH265RateControlInfoKHR){
         .sType = VK_STRUCTURE_TYPE_VIDEO_ENCODE_H265_RATE_CONTROL_INFO_KHR,
+        .flags = VK_VIDEO_ENCODE_H265_RATE_CONTROL_REGULAR_GOP_BIT_KHR,
+        .subLayerCount = 1,
+        .gopFrameCount = avctx->gop_size,
+        .idrPeriod = avctx->gop_size,
+        .consecutiveBFrameCount = avctx->max_b_frames,
     };
 
     hpic->vkrc_layer_info = (VkVideoEncodeH265RateControlLayerInfoKHR){
@@ -873,8 +878,8 @@ static int vulkan_encode_h265_init_pic_headers(AVCodecContext *avctx,
     };
 
     pic->codec_info = &hpic->vkh265pic_info;
-    /*pic->codec_layer = &hpic->vkrc_info;*/
-    /*pic->codec_rc_layer = &hpic->vkrc_layer_info;*/
+    pic->codec_layer = &hpic->vkrc_info;
+    pic->codec_rc_layer = &hpic->vkrc_layer_info;
 
     return 0;
 }
