@@ -809,7 +809,7 @@ static int vulkan_encode_h265_init_pic_headers(AVCodecContext *avctx,
             .cross_layer_bla_flag = 0,
             .pic_output_flag = 0,
             .no_output_of_prior_pics_flag = 0,
-            .short_term_ref_pic_set_sps_flag = 0,
+            .short_term_ref_pic_set_sps_flag = 1, // this signals that the short term RPS we're referring to is specified in SPS (StdVideoH265SequenceParameterSet) and not directly in the slice header
             .slice_temporal_mvp_enabled_flag = 0,
             /* Reserved */
         },
