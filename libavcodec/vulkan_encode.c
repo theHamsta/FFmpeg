@@ -680,7 +680,7 @@ static int vulkan_encode_issue(AVCodecContext *avctx,
         .srcPictureResource = (VkVideoPictureResourceInfoKHR) { // SPEC: this should be separate
             .sType = VK_STRUCTURE_TYPE_VIDEO_PICTURE_RESOURCE_INFO_KHR,
             .pNext = NULL,
-            .codedOffset = 0,
+            .codedOffset = {0, 0},
             .codedExtent = (VkExtent2D){ src->width, src->height },
             .baseArrayLayer = 0,
             .imageViewBinding = pic->view,
