@@ -633,8 +633,8 @@ static int vulkan_encode_issue(AVCodecContext *avctx,
     };
     encode_ctrl = (VkVideoCodingControlInfoKHR) {
         .sType = VK_STRUCTURE_TYPE_VIDEO_CODING_CONTROL_INFO_KHR,
-        /*.pNext = &rc_info,*/
-        .flags = 0 //VK_VIDEO_CODING_CONTROL_ENCODE_RATE_CONTROL_BIT_KHR,
+        .pNext = &rc_info,
+        .flags = VK_VIDEO_CODING_CONTROL_ENCODE_RATE_CONTROL_BIT_KHR,
     };
 
     /* Current picture */
